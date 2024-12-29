@@ -1,0 +1,253 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 6.2 Understand SparkSession and Context
+Date: 2021-08
+Spark Version: 2.4.5
+Python Version: 3.7.4 
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta7
+============================================================
+
+Starting an Interactive Spark Shell
+===================================
+
+# Start with Scala front-end (default) (:q or :quit to exit)
+# https://spark.apache.org/docs/1.6.2/quick-start.html
+
+  $ spark-shell
+
+# Start with R front-end (q() to exit)
+# https://spark.apache.org/docs/1.6.2/sparkr.html
+
+  $ sparkR
+
+# Start with Python front-end (quit() or ctrl-D to exit)
+# https://spark.apache.org/docs/1.6.2/quick-start.html
+
+  $ pyspark
+
+# A Spark, PySpark, or SparkR program can be run by using:
+
+  $ spark-submit PROGRAM-NAME
+
+# There are several options to "spark-submit". One of the more useful is
+# the number of executors (independent cores used by the program).
+# If you are operating on a YARN based Hadoop cluster using the 
+# "spark-submit --num-executors N" option can be used (N is the number
+# of executors. If no executors are provided, the default is two executors.
+
+What is a Spark Context?
+========================
+
+# A Spark context holds the parameters that are used by the Spark-Driver
+# to run a Spark program. These can include the number of executor cores,
+# amount of executor and driver memory, driver hostname, etc.
+
+# When an interactive PySpark session is started (by running "pyspark" from the 
+# command line), it reports "SparkSession available as 'spark'". In an interactive 
+# PySpark session, this information is used to automatically create a
+# Spark context called "sc". In a stand-alone PySpark application (run by using
+# "spark-submit"), the Spark context must be created by using:
+
+   sc=spark.sparkContext
+
+# Previously, before version 2, there were other contexts available, e.g. an SQL context 
+# and a Hive context that provided configuration and data to use spark SQL 
+# and Hadoop Hive. For instance, in PySpark version 1, to create a SQL context, 
+# the current "sc" is augmented with information in the SQL context. 
+
+  sql = SQLContext(sc)
+
+# In version 2, SparkSession contains and replaces the old SQLContext 
+# and HiveContext methods. The old SQLContext and 
+# HiveContext are kept for backward compatibility, however.
+#
+# !!! SparkSession is actually an equivalent of the SQLContext. !!!
+#
+# Some examples will help illustrate this situation. On the LHM, the 
+# SparkSession settings can be viewed as follows:
+
+  >>> for x in spark.sparkContext.getConf().getAll(): print (x)
+  ... 
+  ('spark.eventLog.enabled', 'true')
+  ('spark.history.fs.cleaner.maxAge', '7d')
+  ('spark.history.ui.port', '18080')
+  ('spark.eventLog.dir', 'file:///tmp/spark-events')
+  ('spark.executor.id', 'driver')
+  ('spark.driver.host', 'localhost')
+  ('spark.driver.memory', '1g')
+  ('spark.app.name', 'PySparkShell')
+  ('spark.history.fs.cleaner.enabled', 'true')
+  ('spark.app.id', 'local-1634155736401')
+  ('spark.r.backendConnectionTimeout', '600000')
+  ('spark.history.fs.cleaner.maxNum', '20')
+  ('spark.rdd.compress', 'True')
+  ('spark.history.fs.logDirectory', 'file:///tmp/spark-events')
+  ('spark.serializer.objectStreamReset', '100')
+  ('spark.master', 'local[*]')
+  ('spark.submit.deployMode', 'client')
+  ('spark.driver.port', '39078')
+  ('spark.history.fs.cleaner.interval', '1d')
+  ('spark.ui.showConsoleProgress', 'true')
+
+# Other Spark installations may have many more or different variables.
+# Note that these settings are the same for currently defined
+# AND AUTOMATICALLY PROVIDED Spark context, "sc". 
+
+  >>> for x in sc.getConf().getAll(): print (x)
+
+Changing Settings in the PySpark Interactive Environment
+--------------------------------------------------------
+# Other variables that define/tell Spark how to run and
+# where to find things can be set using the following procedure. 
+
+# For instance the number of executors can be changed using the
+# "spark.executor.instances" variable 
+
+
+# In the REPL, first, set the new variable using the following:
+
+  >>> conf = spark.sparkContext.getConf().setAll([('spark.executor.instances', '4')])
+
+# Note: multiple variables can be set with this command
+#
+# conf = spark.sparkContext.getConf().setAll([ \
+#                    ('spark.executor.memory', '4g'), \ 
+#                    ('spark.app.name', 'My Cool App'), \
+#                    ('spark.executor.cores', '4'), \
+#                    ('spark.driver.memory','4g') \
+#                    ])
+
+# Next, stop the current context (because it is using the old settings)
+
+  >>> spark.sparkContext.stop()
+
+# Restart the session with new settings. the "getOrCreate" method
+# gets the existing SparkSession or, if there is no existing one, 
+# creates a new one.
+
+  >>> spark = SparkSession.builder.config(conf=conf).getOrCreate()
+
+# Check the LHM settings 
+
+  >>> for x in spark.sparkContext.getConf().getAll(): print (x)
+  ... 
+  ('spark.eventLog.enabled', 'true')
+  ('spark.executor.instances', '4')                <<<<<<<< NEW
+  ('spark.history.fs.cleaner.maxAge', '7d')
+  ('spark.history.ui.port', '18080')
+  ('spark.eventLog.dir', 'file:///tmp/spark-events')
+    ...
+  [Same as above]
+    ...
+  ('spark.history.fs.cleaner.interval', '1d')
+  ('spark.ui.showConsoleProgress', 'true')  
+
+# IMPORTANT: A new spark context, "sc," needs to be created with the new SparkSession
+# settings, otherwise is you use the old context and the new settings will not be present.
+
+  >>> sc=spark.sparkContext
+
+# To check the Spark Context, use
+
+  >>> sc.getConf().getAll()
+
+# Next time an Action runs it will use four executors
+# UNLESS
+#  a) there is no need due to data size
+#  b) there is not enough free memory or cores to start the extra executors
+#     (This is typically the situation in the LHM unless it has been started
+#      with extra memory and cores)
+#  c) there are other resource related reasons (longer more
+#     detailed discussion)
+
+Where to find Possible Settings?
+--------------------------------
+
+# Brace yourself. The multitude of settings can be found here 
+
+  http://spark.apache.org/docs/2.4.5/configuration.html#runtime-environment
+
+# Notice the "docs" directory have version sub-directories. 
+# Start with 
+
+    http://spark.apache.org/docs
+
+# find your version, then search for "Configuration:" link under "Other Documents:"
+# Curiously, "spark.executor.instances" is not specifically called out on this page
+# all other option are mentioned however.
+
+
+Run Spark Applications Stand Alone
+==================================
+
+The PySpark interactive shell (Read, Evaluate, Print, Loop or REPL) will be used 
+in Lesson 6.3. The following is for using the spark-submit command.
+
+Changing Settings in a PySpark Script
+-------------------------------------
+
+# In the above example, we changed the "spark.executor.instances" 
+# from within the interactive environment. Ideally we would 
+# like to set this as part of our stand-alone PySpark scripts
+#
+# The spark-submit command does provide some run-time options
+# (e.g. --num-executors to set the number of spark executors on a cluster)
+# However, other options can be changed using the following
+# examples as a guide.
+#
+# Consider, pi-estimate.py that estimates the value of pi 
+# by counting the number of random points are inside a
+# unit circle within a unit square. The ratio of of inside/outside
+# can be used to estimate the value of pi. A listing follows:
+
+    import pyspark
+    # Note we need pyspark.sql to get SparkSession
+    from pyspark.sql import SparkSession
+    from numpy import random
+
+    # Here is where we define the new parameters (Application Name and
+    # spark.executor.instances Also, getOrCreate will add to the existing
+    spark = SparkSession.builder \
+    .appName("Pi Estimate Example") \
+    .config('spark.executor.instances', '4') \
+    .getOrCreate()
+    # Define/update the Spark context.
+    sc=spark.sparkContext
+
+    n=5000000
+    def sample(p):
+        x, y = random.random(), random.random()
+        return 1 if x*x + y*y < 1 else 0
+    # we could substitute "spark.sparkContext" for "sc" and it will work
+    count = sc.parallelize(range(0,n)).map(sample).reduce(lambda a, b: a + b)
+    print ("Pi is roughly %f" % (4.0 * count / n))
+
+# HINT: The number of cores available to spark in the Linux Hadoop Minimal 
+# can be found by issuing the following command
+
+  $ lscpu |grep -m1 "CPU(s):"
+
+Monitoring Spark Applications
+=============================
+
+Spark Jobs can be monitored using the Spark UI available at port 18080.
+To access this page, use a browser on the host system and enter the following URL:
+
+  http://localhost:18080
+
+Many aspects of Spark jobs (both running and completed) can be viewed using this 
+interface. Note: The list of jobs is periodically cleaned.
+
+The Spark Context Takeaway
+==========================
+
+# Initially, the basic PySpark settings will work for examples.
+# In real situations, parallel run-time and executor tuning may me needed.
+# While a full discussion of this topic is rather advanced and could
+# easily expand into a full course, understanding the basics of how to 
+# change context settings and where to find possible settings 
+# can help get you started. 
+
+

@@ -1,0 +1,43 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 7.3 Kafka Producers and Consumers with Python
+Date: 2022-08
+Kafka Version: 2.12
+Python Version: 3.7.4
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta8
+============================================================
+
+
+# Kafka web page 
+#    https://kafka.apache.org/
+# Kafka Python
+#    https://kafka-python.readthedocs.io/en/1.1.0/index.html
+# Python NOAA SDK 
+#    https://github.com/paulokuong/noaa
+#
+# IMPORTANT 1:
+#   Make sure you have installed the following Python libraries for
+#   example: (These should be installed on the LHM, perform as root)
+      pip install noaa-sdk
+      pip install kafka-python
+# IMPORTANT 2:
+#   Make sure the topic weather is created before running
+#   producers and consumers
+
+  kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 1 \
+    --partitions 1 --topic weather
+
+# Note The default Log retention time is 7 days (168 hours)
+# Unless cleared as mentioned in Lesson 7.2
+
+# Simple Kafka weather example:
+
+#  Producer (w-producer.py) - gets NOAA weather forecast for a US zipcode, 
+#                             sends to Kafka weather topic. Runs one time.
+#  Consumer (w-consume.py) - waits for most recent message in Kafka weather
+#                            topic. When received, creates a pandas dataframe
+#                            and reports short weather forecast. Continues to
+#                            wait for next message. 
+

@@ -1,0 +1,498 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 9.2 HBase with Python
+Date: 2022-08
+HBase Version: 2.4.10
+Hadoop Version: 3.3.0
+Python Version: 3.7.4
+Hive Version: 3.1.2
+PySpark Version: 2.4.5 
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta8
+============================================================
+
+# Please see Lesson 2.2 in Part 1 and the following page for more information
+# on installing and using the Linux Hadoop Minimal (LHM) virtual machine.
+#
+#  https://www.clustermonkey.net/download/LiveLessons/Big_Data_Engineering_Foundations
+#
+# If needed, see Lesson 2.3 for a brief introduction to the Linux command line.
+# Reference:
+#   https://hbase.apache.org/
+#   https://happybase.readthedocs.io/en/latest/user.html
+
+
+Confirming HBase Operation
+==========================
+
+# HBase is started automatically when the LHM starts. The HBase 
+# shell should connect with the HBase server. 
+#
+# HBase uses the Zookeeper service. Zookeeper is started as part of Kafka.
+# Thus, Kafka must be running for zookeeper to be started. If there seems
+# to be issues with HBase, restart both Kafka and HBase as the root user:
+
+   # systemctl restart kafka
+   # systemctl restart hbase
+
+Starting HBase Shell and Getting Status
+=======================================
+
+# Start the HBase shell by typing
+
+  $ hbase shell
+
+# The shell may take some time to start. The prompt should look like the 
+# following:
+
+  $ hbase shell
+  HBase Shell
+  Use "help" to get list of supported commands.
+  Use "exit" to quit this interactive shell.
+  For Reference, please visit: http://hbase.apache.org/2.0/book.html#shell
+  Version 2.4.10, r3e5359c73d1a96dd7d2ac5bc8f987e9a89ef90ea, Mon Feb 28 10:03:15 PST 2022
+  Took 0.0026 seconds                                                
+  hbase:001:0> 
+
+# There are three options for status. Can be 'summary', 'simple', or 'detailed'. 
+# The default is 'summary'.
+
+  hbase:001:0> status
+  1 active master, 0 backup masters, 1 servers, 0 dead, 1.0000 average load
+  Took 2.2551 seconds 
+
+# To find version
+
+  hbase:002:0> version
+  2.4.10, r3e5359c73d1a96dd7d2ac5bc8f987e9a89ef90ea, Mon Feb 28 10:03:15 PST 2022
+  Took 0.0008 seconds        
+ 
+# To find user name
+
+  hbase:003:0> whoami
+  hands-on (auth:SIMPLE)
+      groups: hadoop, hands-on
+  Took 0.0491 seconds               
+
+# To list tables
+
+hbase:004:0> list
+
+  TABLE                
+  0 row(s)
+  Took 0.2914 seconds     
+  => ["test"]
+
+
+Data For Table
+==============
+
+# Use stock data for Apple. Download from Google finance, name file "Apple-stock.csv"
+
+  $ wget -O Apple-stock.csv http://www.google.com/finance/historical?q=NASDAQ:AAPL\&authuser=0\&output=csv
+
+# View first 10 lines, columns are: Date, Open, High, Low, Close, Volume
+# The entire file is 251 lines.
+
+  $ head Apple-stock.csv
+  Date,Open,High,Low,Close,Volume
+  6-May-15,126.56,126.75,123.36,125.01,71820387
+  5-May-15,128.15,128.45,125.78,125.80,49271416
+  4-May-15,129.50,130.57,128.26,128.70,50988278
+  1-May-15,126.10,130.13,125.30,128.95,58512638
+  30-Apr-15,128.64,127.88,124.58,125.15,83195423
+  29-Apr-15,130.16,131.59,128.30,128.64,63386083
+  28-Apr-15,134.46,134.54,129.57,130.56,118923970
+  27-Apr-15,132.31,133.13,131.15,132.65,96954207
+  24-Apr-15,130.49,130.63,129.23,130.28,44525905
+
+
+Create a Table
+==============
+
+# If using a shared system, it might be advisable to use your user-id (uid) 
+# to create tables.
+# For example: user "hands-on" the command
+# 
+
+   hbase:005:0> create 'hands-on_apple', 'price', 'volume'
+
+# In this case, just create table apple with two columns "price" and "volume"
+# The "Date" field will be used as the row key.
+
+  hbase:006:0> create 'apple', 'price' , 'volume'
+  Created table apple
+  Took 2.7066 seconds                        
+  => Hbase::Table - apple
+
+# The table shows up in the "list" command results
+
+  hbase:007:0> list
+  TABLE         
+  apple                                             
+  1 row(s)
+  Took 0.0941 seconds         
+  => ["apple"]
+
+# Data can be manually entered as follows. Considering HBase is designed
+# for Terabytes of data, this is a trivial demonstration at best.
+# Note, the price column "family" can have four values "open", "high", "low", "close"
+# The Row key is the Date and is used to reference the Row.
+# The following example enters the first row of the data in "Apple-stock.csv"
+# (ignoring the header, also not use of single quotes for all data elements
+
+  hbase:008:0> put 'apple','6-May-15','price:open','126.46'
+  Took 1.1669 seconds  
+
+# The rest can be cut and pasted into the HBase shell prompt
+
+  hbase:009:0> put 'apple','6-May-15','price:open','126.46'
+  Took 1.1669 seconds                                                                   
+  hbase:010:0> put 'apple','6-May-15','price:high','126.75'
+  Took 0.0335 seconds                                                
+  hbase:011:0> put 'apple','6-May-15','price:low','123.36'
+  Took 0.0127 seconds                                                   
+  hbase:012:0> put 'apple','6-May-15','price:close','125.01'
+  Took 0.0419 seconds                     
+  hbase:013:0> put 'apple','6-May-15','volume:amount','71820387'
+  Took 0.0507 seconds
+
+Some Basic Commands
+===================
+
+Show data that was just entered
+-------------------------------
+
+  hbase:014:0> scan 'apple'
+  ROW               COLUMN+CELL  
+   6-May-15         column=price:close, timestamp=2022-10-24T16:38:01.506, value=125.01   
+   6-May-15         column=price:high, timestamp=2022-10-24T16:37:16.302, value=126.75
+   6-May-15         column=price:low, timestamp=2022-10-24T16:37:30.209, value=123.36 
+   6-May-15         column=price:open, timestamp=2022-10-24T16:35:40.105, value=126.46
+   6-May-15         column=volume:, timestamp=2022-10-24T16:38:16.129, value=71820387 
+  1 row(s)
+  Took 0.1975 seconds
+
+Access data by Row key 
+----------------------
+
+# There is only one row at this point, but it illustrates how to access "by row"
+
+  hbase:015:0> get 'apple', '6-May-15'
+  COLUMN                  CELL                                                              
+   price:close            timestamp=2022-10-24T16:38:01.506, value=125.01      
+   price:high             timestamp=2022-10-24T16:37:16.302, value=126.75         
+   price:low              timestamp=2022-10-24T16:37:30.209, value=123.36    
+   price:open             timestamp=2022-10-24T16:35:40.105, value=126.46   
+   volume:amount          timestamp=2022-10-24T16:38:16.129, value=71820387
+  1 row(s)
+Took 0.1067 seconds  
+
+
+Delete single cell
+------------------
+
+# Delete the low price cell (price:low)
+
+  hbase:016:0> delete 'apple', '6-May-15' , 'price:low'
+  Took 0.1516 seconds
+
+# Show the current cells for the row "6-May-15"
+  
+  hbase:017:0> get 'apple', '6-May-15'
+  COLUMN                  CELL                                 
+   price:close            timestamp=2022-10-24T16:38:01.506, value=125.01 
+   price:high             timestamp=2022-10-24T16:37:16.302, value=126.75 
+   price:open             timestamp=2022-10-24T16:35:40.105, value=126.46
+   volume:amount          timestamp=2022-10-24T16:38:16.129, value=71820387 
+  1 row(s)
+  Took 0.0850 seconds 
+
+Add a new family member cell with data
+--------------------------------------
+# Use "put" with new family cell name
+
+  hbase:018:0> put 'apple', '6-May-15', 'price:ave', '125.74'
+  Took 0.0481 seconds
+
+# See if it is there
+
+hbase:019:0> get 'apple', '6-May-15'
+  COLUMN                  CELL                                          
+   price:ave              timestamp=2022-10-24T16:49:04.385, value=125.74      
+   price:close            timestamp=2022-10-24T16:38:01.506, value=125.01      
+   price:high             timestamp=2022-10-24T16:37:16.302, value=126.75      
+   price:open             timestamp=2022-10-24T16:35:40.105, value=126.46     
+   volume:amount          timestamp=2022-10-24T16:38:16.129, value=71820387        
+  1 row(s)
+  Took 0.0283 seconds
+
+
+Get individual cell(s)
+----------------------
+# Get data from family cell
+                                                                                      
+  hbase:020:0> get 'apple', '6-May-15', {COLUMN => 'volume'}
+  COLUMN                  CELL                                  
+   volume:amount          timestamp=2022-10-24T16:38:16.129, value=71820387
+  1 row(s)
+  Took 0.0966 seconds  
+
+# Get data from multiple cells (in same row)
+ 
+  hbase:021:0> get 'apple', '6-May-15', {COLUMN => ['price:ave','price:high']}
+  COLUMN                  CELL                          
+   price:ave              timestamp=2022-10-24T16:49:04.385, value=125.74      
+   price:high             timestamp=2022-10-24T16:37:16.302, value=126.75  
+  1 row(s)
+  Took 0.0515 seconds
+
+Delete a Row and Table
+----------------------
+
+# Delete all data in row "6-May-15"
+
+  hbase(main):022:0> deleteall 'apple', '6-May-15'
+  Took 0.0297 seconds
+
+# look for data, now gone
+
+  hbase(main):023:0> scan 'apple'
+  ROW                              COLUMN+CELL
+  0 row(s)
+  Took 0.0041 seconds
+
+# If all data needs to be deleted, it is easier to drop the table and 
+# recreate it. First, disable the table
+                                                                                                       
+  hbase(main):017:0> disable 'apple'
+  Took 0.5290 seconds
+
+# drop the table
+
+  hbase(main):018:0> drop 'apple'
+  Took 0.4352 seconds
+
+# List the tables                                                                                                           
+  hbase:026:0> list
+  TABLE                               
+  0 row(s)
+  Took 0.0191 seconds                                             
+  => []
+
+Automated Data Loading
+======================
+# The Apple stock data is 251 lines. A script called "input_to_hbase.sh" is 
+# provided to automate loading using the above
+# hbase commands. The script is inefficient and should only be used for testing.
+
+# A more efficient way to input large amounts of data is to use use bulk input
+# ImportTsv command.
+
+# First, strip the header line
+
+  $ sed  -e "1d" Apple-stock.csv >Apple-stock-no-header.csv 
+
+# Make directory and copy to HDFS
+
+  $ hdfs dfs -mkdir HBase-Import 
+  $ hdfs dfs -put Apple-stock-no-header.csv HBase-Import
+
+# recreate the database in HBase 
+
+  hbase:027:0> create 'apple', 'price' , 'volume'
+  ...
+
+# ImportTsv will auto load into HBase using MapReduce, note the use of option
+#  " -Dimporttsv.separator=," to signify the "," separator option. Make sure i
+# the HBase table exists and is empty. Enter the following command (all on one line):
+
+  $ hbase org.apache.hadoop.hbase.mapreduce.ImportTsv \
+      -Dimporttsv.separator=, \
+      -Dimporttsv.columns=HBASE_ROW_KEY,price:open,price:high,price:low,price:close,volume:amount  apple /user/hands-on/HBase-Import/Apple-stock-no-header.csv
+
+  ...
+  MapReduce Output
+  ...
+
+
+# Finally, check the new database:
+
+  $ hbase shell
+
+# Count records:
+
+  hbase:0028:0> count 'apple'
+  251 row(s)
+  Took 3.9459 seconds         
+  => 251
+
+# Scan the table, limit to 3 rows
+
+  hbase:029:0> scan 'apple', {'LIMIT' => 3}
+  ROW               COLUMN+CELL                                                       
+   1-Apr-15         column=price:close, timestamp=2022-10-24T17:15:52.577, value=124.25
+   1-Apr-15         column=price:high, timestamp=2022-10-24T17:15:52.577, value=125.12
+   1-Apr-15         column=price:low, timestamp=2022-10-24T17:15:52.577, value=123.10 
+   1-Apr-15         column=price:open, timestamp=2022-10-24T17:15:52.577, value=124.82
+   1-Apr-15         column=volume:amount, timestamp=2022-10-24T17:15:52.577, value=40621437 
+   1-Aug-14         column=price:close, timestamp=2022-10-24T17:15:52.577, value=96.13
+   1-Aug-14         column=price:high, timestamp=2022-10-24T17:15:52.577, value=96.62 
+   1-Aug-14         column=price:low, timestamp=2022-10-24T17:15:52.577, value=94.81  
+   1-Aug-14         column=price:open, timestamp=2022-10-24T17:15:52.577, value=94.90 
+   1-Aug-14         column=volume:amount, timestamp=2022-10-24T17:15:52.577, value=48511286 
+   1-Dec-14         column=price:close, timestamp=2022-10-24T17:15:52.577, value=115.07
+   1-Dec-14         column=price:high, timestamp=2022-10-24T17:15:52.577, value=119.25
+   1-Dec-14         column=price:low, timestamp=2022-10-24T17:15:52.577, value=111.27 
+   1-Dec-14         column=price:open, timestamp=2022-10-24T17:15:52.577, value=118.81
+   1-Dec-14         column=volume:amount, timestamp=2022-10-24T17:15:52.577, value=83814037 
+  3 row(s)
+  Took 0.1942 seconds 
+
+# Note: the order of data may have changed from the CSV file. 
+
+
+Using Python with HBase
+=======================
+# The Python directory contains three program snippets.
+# 
+#   happybase_read.py - reads data from "apple" HBase table that was created above
+#                       with ImportTsv method.
+#   happybase_create.py - creates an HBase weather table with date; temp; wind; precip
+#   happybase_write.py - example of how to write to the HBase weather table 
+#
+# These examples illustrate the basics of using HappyBase to access HBase from
+# Python. See the HappyBase User Guide for more examples:
+#
+#   https://happybase.readthedocs.io/en/latest/user.html
+# 
+
+Using Hive and PySpark with HBase
+=================================
+# The easiest way to pull data out of HBase for use with Hive and Spark
+# (specifically PySpark) is to create an external table in Hive. Once this 
+# table is created, an internal Hive table in Parquet format can be created and 
+# then read by PySpark.  
+#
+# There may be more direct methods to read HBase data into PySpark, however
+# Lesson "6.4: PySpark Examples Using Zeppelin" explains that recent versions 
+# of Spark and Hive have limited the ability (for security reasons) to use each 
+# others tables or data frames.
+
+Import HBase table as Hive External Table
+-----------------------------------------
+
+# The hbase_to_hive.sql (in directory Hive-PySpark) can be used to create
+# an external Hive table and then "move" the apple HBase data (recall it
+# is and external table, so no data are copied)
+# The Hive script will also show the schema and print the first 5 rows.
+
+  $ cd Hive-PySpark
+  $ hive -f hbase_to_hive.sql 
+  Hive Session ID = 96a2568a-7b16-4c92-a29d-d88ff078732d
+
+  Logging initialized using configuration in file:/opt/apache-hive-3.1.2-bin/conf/hive-log4j2.properties Async: true
+  Hive Session ID = 9d505ea2-6ce6-47ae-bb21-2169a132baf2
+  OK
+  Time taken: 10.521 seconds
+  OK
+  caldate             	string              	                    
+  open                	double              	                    
+  high                	double              	                    
+  low                 	double              	                    
+  close               	double              	                    
+  volume              	bigint              	                    
+  Time taken: 0.522 seconds, Fetched: 6 row(s)
+  OK
+  1-Apr-15	124.82	125.12	123.1	124.25	40621437
+  1-Aug-14	94.9	96.62	94.81	96.13	48511286
+  1-Dec-14	118.81	119.25	111.27	115.07	83814037
+  1-Jul-14	93.52	94.07	93.13	93.52	38223477
+  1-May-15	126.1	130.13	125.3	128.95	58512638
+  Time taken: 7.005 seconds, Fetched: 5 row(s)
+
+# From this point, Hive can be used to process the data in the apple table.
+
+Import the HBase Table as a PySpark Data Frame
+----------------------------------------------
+
+# As mentioned the best way to import data into a PySpark data frame
+# is through a Parquet table. The Hive script, hive -f hive-to-parquet.sql,
+# will save the external table to a Parquet table. Hive will use
+# a MapReduce job to do the transfer. The first 5 lines of the apple_Parquet
+# table are printed.
+
+  $ hive -f hive-to-parquet.sql
+  Hive Session ID = cdb9c2a5-0e5c-421e-856e-abc8f29725e7
+
+  Logging initialized using configuration in file:/opt/apache-hive-3.1.2-bin/conf/hive-log4j2.properties Async: true
+  Hive Session ID = f9182cc8-592c-497a-ac93-8f0d86262310
+  OK
+  Time taken: 6.086 seconds
+  Query ID = hands-on_20221027102955_e876cfa3-26cf-4f8f-9534-709bb2f1a5f5
+  Total jobs = 3
+  Launching Job 1 out of 3
+  ...
+  Hadoop job information for Stage-1: number of mappers: 1; number of reducers: 1
+  2022-10-27 10:31:06,960 Stage-1 map = 0%,  reduce = 0%
+  2022-10-27 10:31:48,112 Stage-1 map = 100%,  reduce = 0%, Cumulative CPU 34.39 sec
+  2022-10-27 10:32:09,221 Stage-1 map = 100%,  reduce = 100%, Cumulative CPU 45.99 sec
+  MapReduce Total cumulative CPU time: 45 seconds 990 msec
+  ...
+  Loading data to table default.apple_parquet
+  MapReduce Jobs Launched: 
+  Stage-Stage-1: Map: 1 Reduce: 1 Cumulative CPU: 45.99 sec HDFS Read: 28293 HDFS Write: 18733 SUCCESS
+  Total MapReduce CPU Time Spent: 45 seconds 990 msec
+  OK
+  Time taken: 140.195 seconds
+  OK
+  1-Apr-15	124.82	125.12	123.1	124.25	40621437
+  1-Aug-14	94.9	96.62	94.81	96.13	48511286
+  1-Dec-14	118.81	119.25	111.27	115.07	83814037
+  1-Jul-14	93.52	94.07	93.13	93.52	38223477
+  1-May-15	126.1	130.13	125.3	128.95	58512638
+  Time taken: 0.808 seconds, Fetched: 5 row(s)
+
+# Once the apple_Parquet table has been produced PySpark can read the table
+# into a data frame using the read-apple_parquet.py program. The program 
+# also prints the first 5 rows of the data frame (df_apple).
+
+  $ spark-submit read-apple_parquet.py 
+  +--------+------+------+------+------+--------+
+  | caldate|  open|  high|   low| close|  volume|
+  +--------+------+------+------+------+--------+
+  |1-Apr-15|124.82|125.12| 123.1|124.25|40621437|
+  |1-Aug-14|  94.9| 96.62| 94.81| 96.13|48511286|
+  |1-Dec-14|118.81|119.25|111.27|115.07|83814037|
+  |1-Jul-14| 93.52| 94.07| 93.13| 93.52|38223477|
+  |1-May-15| 126.1|130.13| 125.3|128.95|58512638|
+  +--------+------+------+------+------+--------+
+  only showing top 5 rows
+
+HBase Web GUI
+=============
+# There is also a Web GUI on the LHM:
+
+  http://localhost:16010/master-status
+
+# There is not much user data available other than information about the tables.
+
+Clearing HBase Issues
+=====================
+
+# If HBase become unstable and/or the server dies, try the following:
+# ALL DATA WILL BE LOST 
+
+  systemctl stop hbase
+
+# as user hdfs ($su - (give root pw), # su - hdfs)
+
+  hdfs dfs -rm -r /hbase/*
+
+# then (exit user hdfs, $ exit, # exit) as user hands-on 
+
+  $ zookeeper-shell.sh localhost:2181 deleteall /hbase
+
+  systemctl start hbase
+

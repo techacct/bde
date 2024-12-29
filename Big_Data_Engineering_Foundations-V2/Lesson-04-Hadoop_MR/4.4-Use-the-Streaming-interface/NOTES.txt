@@ -1,0 +1,162 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 4.4 Use the Streaming Interface 
+Date: 2021-08
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta6
+============================================================
+
+# There are several methods to program Hadoop MapReduce. The most direct and lowest level
+# is using the Java Hadoop API or the C++ Pipes library.
+
+# Many users prefer the flexibility of the Streams Interface that allows a variety 
+# of programming language to be used.
+
+
+The Streams Interface
+=====================
+
+# This method will work with any program that can read and write TEXT DATA
+# to stdin and stdout. The following is based on this example from Michael Noll
+# (used with permission):
+#   http://www.michael-noll.com/tutorials/writing-an-hadoop-mapreduce-program-in-python/
+
+Use the Local Command Line 
+--------------------------
+# In this example we will develop a Hadoop Streaming word counting application.
+# Before we use Hadoop, however, we can develop and test our algorithm
+# as follows.
+#
+# There are three programs to use when working from the command line:
+#
+#   pymapper.py - a python word count mapper
+#   shuffle.sh - a simulated shuffle step using a bash script 
+#   pyreducer.py - a python word count reducer
+#
+# The pipe function "|" will be used to feed the output of one program (stage)
+# into next program (stage)
+#
+# 1. Run the pymapper.py with some simple data and change
+#    the input words to key value pairs.
+#
+#    (Note: the "./" in front of the command is a way to specify
+#    the program in "this" current directory.)
+
+  $ echo "see spot run run spot run see the cat" | ./pymapper.py
+     see	1
+     spot	1
+     run	1
+     run	1
+     spot	1
+     run	1
+     see	1
+     the	1
+     cat	1
+
+# 2. Next, use "sort -k1,1" ( sort output using the key "1") in a bash script 
+#    called shuffle to order the key value pairs:
+
+  $ echo "see spot run run spot run see the cat" | ./pymapper.py | ./shuffle.sh
+     cat	1
+     run	1
+     run	1
+     run	1
+     see	1
+     see	1
+     spot	1
+     spot	1
+     the	1
+
+# 3. Add the reducer stage and count all the same keys
+
+  $ echo "see spot run run spot run see the cat" | ./pymapper.py | ./shuffle.sh | ./pyreducer.py
+     cat	1
+     run	3
+     see	2
+     spot	2
+     the	1
+
+Use Hadoop MapReduce Streaming Interface
+----------------------------------------
+
+# We can use the EXACT SAME Python programs (except the shuffle.sh script) to perform
+# the word count using Hadoop MapReduce Streaming Interface Instead of using a short 
+# stream of words we will use two books (War and Peace and Hunchback of Notre Dame) 
+# 
+# 1. Set the execution path (i.e. where to find the hadoop-streaming program
+#    If using the LHM enter: 
+
+    export HSTREAMING=/opt/hadoop-3.3.0/share/hadoop/tools/lib/hadoop-streaming-3.3.0.jar
+
+# Load some text data into HDFS (war-and-peace.txt was used in Lesson-3.2)
+
+  $ hdfs dfs -mkdir books-input
+  $ hdfs dfs -put data/Hunchback-of-ND.txt books-input
+  $ hdfs dfs -put ../../Lesson-03-Hadoop_HDFS/3.2-HDFS-Command-Line-Tools/data/war-and-peace.txt books-input
+
+# 3. Make sure output directory is removed from any previous runs
+#    (i.e.  hdfs dfs -rm -r  books-output)
+
+# 4. Run the following command (The "\" are continuation characters that 
+#    allows long lines to be broken into separate parts. In this case, it easier
+#    to see the various arguments. When pasted as a command, it will be treated as
+#    a single line)
+
+  $ yarn jar $HSTREAMING \
+    -files pymapper.py,pyreducer.py \
+    -mapper pymapper.py \
+    -reducer pyreducer.py \
+    -input /user/hands-on/books-input \
+    -output /user/hands-on/books-output
+
+# 5. Typical Hadoop output follows.
+#    Inspect the results directory
+
+  $ hdfs dfs -ls books-output
+
+  Found 2 items
+  -rw-r--r--   1 hands-on hadoop          0 2021-08-13 17:10 books-output/_SUCCESS
+  -rw-r--r--   1 hands-on hadoop     650574 2021-08-13 17:10 books-output/part-00000
+
+#    Inspect the results
+
+  $ hdfs dfs -head  books-output/part-00000
+     "'Come	1
+     "'Dieu	1
+     "'Dio	1
+     "'From	1
+     "'Grant	1
+     "'I	4
+
+# 6. Add a second reducer using "-numReduceTasks" option
+#    The number of mappers is determined by the size of the input files.
+#    Clean-up the output directory first
+
+  $ hdfs dfs -rm -r books-output
+
+  $ yarn jar $HSTREAMING \
+    -files pymapper.py,pyreducer.py \
+    -mapper pymapper.py \
+    -reducer pyreducer.py \
+    -numReduceTasks 2 \
+    -input /user/hands-on/books-input \
+    -output /user/hands-on/books-output
+
+#    Inspect the output files. There are now two results files because reducers were
+#    used. Each reducer writes its own results file to HDFS
+
+  $ hdfs dfs -ls books-output
+
+  Found 3 items
+  -rw-r--r--   1 hands-on hadoop          0 2021-08-13 17:14 books-output/_SUCCESS
+  -rw-r--r--   1 hands-on hadoop     327724 2021-08-13 17:14 books-output/part-00000
+  -rw-r--r--   1 hands-on hadoop     322850 2021-08-13 17:14 books-output/part-00001
+     
+# 7. For completeness, the long form (without the continuation lines) of the command is:
+
+  $ yarn jar $HSTREAMING -files pymapper.py,pyreducer.py -mapper pymapper.py -reducer pyreducer.py -numReduceTasks 2 -input /user/hands-on/books-input -output /user/hands-on/books-output
+
+# 8. For convenience, you can add place this command in a "bash script" as shown 
+#    in the "run.sh" script.
+

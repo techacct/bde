@@ -1,0 +1,10 @@
+import
+   --connect
+   jdbc:mysql://localhost/world
+    --driver 
+   com.mysql.jdbc.Driver
+   --username
+   sqoop
+   --password
+   sqoop
+

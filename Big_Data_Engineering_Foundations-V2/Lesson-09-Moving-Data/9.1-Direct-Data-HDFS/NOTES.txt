@@ -1,0 +1,234 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 9.1 Direct Data Movement with HDFS
+Date: 2022-10
+Hadoop Version: 3.3.0
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta8
+============================================================
+
+# Please see Lesson 2.2 in Part 1 and the following page for more information
+# on installing and using the Linux Hadoop Minimal (LHM) virtual machine.
+#
+#  https://www.clustermonkey.net/download/LiveLessons/Big_Data_Engineering_Foundations
+#
+# If needed, see Lesson 2.3 for a brief introduction to the Linux command line.
+
+Additional HDFS Methods
+=======================
+# The following are some additional methods for moving data
+# into and out of HDFS. 
+
+Example CSV Files
+-----------------
+# CSV files from the web will be used for some of these examples.
+# Source: https://people.sc.fsu.edu/~jburkardt/data/csv/csv.html
+#
+# Descriptions:
+#   snakes_count_1000.csv and snakes_count_10000.csv are simple CSV files with game
+#   length for one-player version of Snakes and Ladders, 1000 records, each with 2
+#   values: Game Index, Game Length. There is also an initial header line.
+#   The top 3 lines are as follows
+#     "Game Number", "Game Length"
+#     1, 30
+#     2, 29
+#     3, 31
+#
+#   hw_200.csv and hw_25000.csv are simple CSV files with height and weight for 200 
+#   and 25000 individuals Each record includes 3 values: index, height (inches), 
+#   weight (pounds). There is also an initial header line.
+#   The top 3 lines are as follows
+#     "Index", "Height(Inches)", "Weight(Pounds)"
+#     1, 65.78331, 112.9925
+#     2, 71.51521, 136.4873
+#     3, 69.39874, 153.0269
+
+
+Additional HDFS Command Usage
+-----------------------------
+
+# By default HDFS will not overwrite files. Use force, "-f" option
+# to overwrite a file
+
+  $ hdfs dfs -put NOTES.txt hdfs-file.txt
+
+  $ hdfs dfs -put -f NOTES.txt hdfs-file.txt
+
+# Text streams may be piped directory in to HDFS
+# Other more robust tools are available because
+# streaming output (e.g logs) generally does not take place
+# on HDFS client systems. (See Kafka, NiFi, Flume)
+  
+  $ echo "See spot. See spot run. Run spot run." | hdfs dfs -put -f - hdfs-file.txt
+
+# use "cat" to look at file. (for larger files, output can be piped through
+# local commands e.g. head, tail, more)
+
+  $ hdfs dfs -cat hdfs-file.txt
+  See spot. See spot run. Run spot run.
+
+# The existence of file in HDFS can done using the "-test" option
+# it will return a "0" if the file exists and a "1" if it does not.
+# This command is most useful in bash shell scripts (or other).
+# For example:
+
+  $ hdfs dfs  -test -e hdfs-file.txt;echo $?
+  0
+  $ hdfs dfs  -test -e hdfs-file.xxx;echo $?
+  1
+
+# Whole directories can be copied into HDFS ("-f" option will work)
+
+  $ hdfs dfs -put -f CSV-write CSV-files
+
+Extracting a Zip File in HDFS
+-----------------------------
+# Many CSV files can be found in compressed "zip" format.
+# Zip files cannot be extracted in HDFS. It is possible to 
+# pipe the extraction thought unzip on the host, however.
+#
+# For instance, create a zip file (hw_25000.csv) from
+# data in CSV-write directory, create two directories in 
+# HDFS (CSV-zipped and CSV-unzipped) and put hw_25000.zip
+# into CSV-zipped directory:
+# 
+  $ cd CSV-write/
+  $ zip hw_25000.zip hw_25000.csv 
+  $ hdfs dfs -mkdir CSV-zipped
+  $ hdfs dfs -mkdir CSV-unzipped
+  $ hdfs dfs -put hw_25000.zip CSV-zipped
+  $ cd ..
+
+# The following command will extract CSV-zipped/hw_25000.zip into 
+# CSV-unzipped/hw_25000.csv in HDFS:
+
+  $ hdfs dfs -cat CSV-zipped/hw_25000.zip | gzip -d | hdfs dfs -put - CSV-unzipped/hw_25000.csv 
+
+
+Pipe Web File Directly into HDFS
+--------------------------------
+# the following procedure can be used to pipe a file directly into HDFS using get (curl 
+# will also work)
+# 
+  $ hdfs dfs -mkdir CSV-read
+  $ wget -O - -o /dev/null  https://people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_10000.csv|hdfs dfs -put - CSV-read/snakes_count_10000.csv
+  $ wget -O - -o /dev/null  https://people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_1000.csv|hdfs dfs -put - CSV-read/snakes_count_1000.csv
+
+
+Read and Write HDFS Files using Pydoop
+======================================
+# Pydoop is a Python interface to Hadoop that allows you to write MapReduce 
+# applications in pure Python. The project page and documentation is located
+# here 
+
+  https://crs4.github.io/pydoop
+
+# While the use of Pydoop to drive Hadoop MapReduce is a nice feature, the
+# ability to read and write to files in HDFS is also very useful.
+
+Install Pydoop on the LHM
+-------------------------
+# If you plan on using Pydoop, you must install it on the LHM.
+# Follow these steps:
+#    1. promote yourself (hands-on user) to the root user
+         $ su -
+#    2. provide the root password "hadoop"
+#    3. Enter the following as the root user:
+         # pip install pydoop
+#    4. Exit the root user and return to "hands-on"
+         # exit
+
+Write Data to HDFS
+------------------
+
+# The pydoop-HDFS-write.py program copies any CSV files in a local directory,
+# CSV-write, to the /user/hands-on/CSV-files/ path in HDFS. You may receive a warning 
+# about "native-hadoop library." This warning can be ignored, or silenced,
+# see below.
+
+  $ python pydoop-HDFS-write.py
+
+  The local source file(s):
+  /home/hands-on/Big_Data_Engineering_Foundations-V2/Lesson-09-Moving-Data/9.1-Direct-Data-HDFS/CSV-write/hw_200.csv
+  /home/hands-on/Big_Data_Engineering_Foundations-V2/Lesson-09-Moving-Data/9.1-Direct-Data-HDFS/CSV-write/hw_25000.csv
+
+  Contents of HDFS directory:
+  ['hdfs://localhost:9000/user/hands-on/CSV-files/hw_200.csv', 'hdfs://localhost:9000/user/hands-on/CSV-files/hw_25000.csv']
+
+
+# If the program is run again it will print a "HDFS file exists" message
+# and exit. 
+
+# The CSV-files directory can be removed and the program re-run using the following:
+
+  hdfs dfs -rm -r CSV-files
+
+Reading Files from HDFS
+-----------------------
+# The pydoop-HDFS-read.py program copies files from HDFS, /user/hands-on/CSV-read,
+# to a local CSV-read directory. You may receive a warning
+# about "native-hadoop library." This warning can be ignored, or silenced,
+# see below.
+
+  $ python pydoop-HDFS-read.py 
+
+  Reading HDFS file(s):
+  hdfs://localhost:9000/user/hands-on/snakes_count-CSV/snakes_count_1000.csv
+  hdfs://localhost:9000/user/hands-on/snakes_count-CSV/snakes_count_10000.csv
+
+  Contents of local directory:
+  /home/hands-on/Big_Data_Engineering_Foundations-V2/Lesson-09-Moving-Data/9.1-Direct-Data-HDFS/CSV-read/snakes_count_1000.csv
+  /home/hands-on/Big_Data_Engineering_Foundations-V2/Lesson-09-Moving-Data/9.1-Direct-Data-HDFS/CSV-read/snakes_count_10000.csv
+
+Removing the "WARN" Message
+---------------------------
+
+# Hadoop will issue a WARNING message because it cannot find 64 bit 
+# libraries for libhdfs. They are compiled as 32 bit. This warning
+# can be ignored. 
+
+2022-10-13 14:58:09,887 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+
+# It can be repressed by promoting yourself to the root user (see above) and 
+# issuing the following command (make sure you include the ">>")
+
+echo "log4j.logger.org.apache.hadoop.util.NativeCodeLoader=ERROR" >> /opt/hadoop-3.3.0/etc/hadoop/log4j.properties
+
+# The above examples will run without the warning.
+
+Read "gzipped" Files Directly Using Pyspark 
+===========================================
+# Pyspark (and Spark) will read certain compressed files directly.
+# Files in gzip format can be read directly.  First, create a gzip file 
+# (different than zip file)
+
+  $ cd  CSV-write
+  $ gzip -c hw_25000.csv >hw_25000.csv.gz
+  $ cd ..
+
+# Start the Pyspark shell and enter the following to load gzip format data
+# into a Spark Data Frame
+
+  $ pyspark
+
+  >>> hw_df = spark.read. \
+      options(header='True'). \
+      csv("file:///home/hands-on/Big_Data_Engineering_Foundations-V2/Lesson-09-Moving-Data/9.1-Direct-Data-HDFS/CSV-write/hw_25000.csv.gz")
+
+  >>> hw_df.show(5)
+  +-----+-----------------+-----------------+
+  |Index| "Height(Inches)"| "Weight(Pounds)"|
+  +-----+-----------------+-----------------+
+  |    1|         65.78331|         112.9925|
+  |    2|         71.51521|         136.4873|
+  |    3|         69.39874|         153.0269|
+  |    4|          68.2166|         142.3354|
+  |    5|         67.78781|         144.2971|
+  +-----+-----------------+-----------------+
+  only showing top 5 rows
+
+Using Other Languages
+======================
+
+# Writing directly to HDFS can also be accomplished using Java, C, and C++.

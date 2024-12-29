@@ -1,0 +1,108 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 3.2 Use HDFS Command Line Tools 
+
+Date: 2021-08
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta6
+============================================================
+
+Before You Begin
+================
+
+HDFS vs hdfs
+------------
+# To avoid confusion when notes refer to "Hadoop Distributed File System"
+# the abbreviation "HDFS" will be used. When HDFS commands are presented
+# the lower case will be used i.e. "hdfs dfs -ls"
+
+User Account
+------------
+
+# This example assumes the users account is "hands-on"
+# If you are using your own account (e.g the Hadoop Minimal VM)
+# change the commands to reflect your account
+
+Backgound
+---------
+
+# To interact with HDFS, the hdfs command must be used. 
+# HDFS provides a series of commands similar to those found in a 
+
+# Recall, HDFS is a separate filesystem from the local filesystem.
+# The following basic commands allow the user to interact with HDFS.
+
+List Files in HDFS
+==================
+
+# To list the files in the root HDFS directory enter the following:
+
+  hdfs dfs -ls /
+  Found 4 items
+  drwxr-xr-x   - yarn hadoop              0 2018-04-06 15:18 /mr-history
+  drwxr-xr-x   - hdfs supergroup          0 2018-01-29 11:38 /test
+  drwxrwxrwx   - hdfs hadoop              0 2018-01-22 19:56 /tmp
+  drwxr-xr-x   - hdfs hadoop              0 2018-04-04 13:50 /user
+
+# To list files in your home directory in HDFS enter the following:
+
+  hdfs dfs -ls
+
+# The same result can be obtained by issuing a:
+
+  hdfs dfs -ls /user/hands-on
+
+
+Make a Directory in HDFS
+========================
+
+# To make a directory in HDFS use the following command. As with the –ls command, 
+# when no path is supplied the users home directory is used.   (i.e. /users/hands-on)
+
+  hdfs dfs -mkdir stuff
+
+Copy Files to HDFS
+==================
+
+# To copy a file from your current local directory into HDFS use the following.
+# Note again, that the absence a full path assumes your home directory. 
+# In this case the file test is placed in the directory stuff, which was created above. 
+
+  hdfs dfs -put data/war-and-peace.txt stuff
+
+# The file transfer can be confirmed by using the –ls command:
+
+  hdfs dfs -ls stuff
+  
+  Found 1 items
+  -rw-r--r--   2 hands-on  hadoop    3288746 2017-12-10 15:14 stuff/war-and-peace.txt
+
+Copy Files from HDFS
+====================
+# Files can be copied back to your local file system using the following. 
+# In this case, the file we copied into HDFS, test, will be copied back 
+# to the current local directory with the name test-local.
+
+  hdfs dfs -get stuff/war-and-peace.txt war-and-peace1.txt
+
+Copy Files within HDFS
+======================
+
+# The following will copy a file in HDFS.
+
+  hdfs dfs -cp stuff/war-and-peace.txt  copy-of-war-and-peace.txt
+
+Delete a File/Directory  within HDFS
+====================================
+
+# The following will delete (place in trash) the HDFS file copy-of-war-and-peace.txt 
+# that was created above. 
+
+  hdfs dfs -rm copy-of-war-and-peace.txt 
+
+# to skip the trash (if trash collection is enabled), use the "-skipTrash" argument
+
+  hdfs dfs -rm -r -skipTrash stuff
+  Deleted stuff
+

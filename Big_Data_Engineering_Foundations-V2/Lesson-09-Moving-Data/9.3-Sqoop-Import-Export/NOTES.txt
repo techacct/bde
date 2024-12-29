@@ -1,0 +1,300 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 9.3 Using Sqoop for Database Movement
+Date: 2022-08
+Sqoop Version: 1.4.7
+Hadoop Version: 3.3.0
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta8
+============================================================
+
+Reference:
+
+   http://sqoop.apache.org/docs/1.4.5/SqoopUserGuide.html
+ 
+
+Download and Load Sample MySQL Data (completed on LHM)
+======================================================
+
+# Assume MariaDB (mysql) is installed and working on the host
+# Ref: http://dev.mysql.com/doc/world-setup/en/index.html
+# Get the database:
+  $ mkdir database
+  $ cd database
+  $ wget https://downloads.mysql.com/docs/world.sql.gz
+  $ gunzip world.sql.gz
+
+# Load into MySQL
+
+   $ mysql -u root
+   MariaDB [(none)]> CREATE DATABASE world;
+   MariaDB [(none)]> USE world;
+   MariaDB [world]>  SOURCE database/world.sql;
+   MariaDB [world]>  SHOW TABLES;
+   +-----------------+
+   | Tables_in_world |
+   +-----------------+
+   | city            |
+   | country         |
+   | countrylanguage |
+   +-----------------+
+   3 rows in set (0.01 sec)
+
+# To see table details:
+
+    MariaDB [world]> SHOW CREATE TABLE country;
+    MariaDB [world]> SHOW CREATE TABLE city;
+    MariaDB [world]> SHOW CREATE TABLE countrylanguage;
+
+
+Add Sqoop User Permissions for Local Machine and Cluster
+========================================================
+
+# For the LHM set permissions for sqoop (done as MariaDB root user) This step
+# has already been completed on the LHM:
+
+   MariaDB [(none)]> GRANT ALL PRIVILEGES ON world.* To 'sqoop'@'localhost' IDENTIFIED BY 'sqoop';
+   MariaDB [(none)]> quit
+
+# For a cluster all nodes need to have permissions to work with MariaDB. For instance,
+# if the clusters is composed of a login node named "headnode" and MariaDB is running
+# on this node, all the the worker nodes on a cluster network (e.g. 10.9.0.0) need
+# the following permissions need to be set in addition to the "localhost" permissions above.
+# (Note: if each worker has a disticnt IP address, then each one needs to be given
+# permissions on MarriaDB on the headnode.
+
+   MariaDB [(none)]> GRANT ALL PRIVILEGES ON world.* To 'sqoop'@'localhost' IDENTIFIED BY 'sqoop';
+   MariaDB [(none)]> GRANT ALL PRIVILEGES ON world.* To 'sqoop'@'10.1.0.%' IDENTIFIED BY 'sqoop';
+   MariaDB [(none)]> quit
+
+# These are the default Sqoop login and password for MariaDB (do not use this in
+# a real system!)
+#
+#   MariaDB login is: sqoop
+#   MariaDB password is: sqoop
+
+# Login as sqoop to test MariaDB
+
+   $ mysql -u sqoop -p
+   MariaDB [(none)]> USE world;
+   MariaDB [world]> SHOW TABLES;
+   +-----------------+
+   | Tables_in_world |
+   +-----------------+
+   | city            |
+   | country         |
+   | countrylanguage |
+   +-----------------+
+   3 rows in set (0.01 sec)
+
+   MariaDB [world]> quit
+
+
+Import Data Using Sqoop
+=======================
+
+# Use Sqoop to List Databases (sqoop still uses "mysql" for MariaDB)
+
+   $ sqoop list-databases --connect jdbc:mysql://localhost/world --username sqoop --password sqoop
+
+   Warning: /usr/lib/sqoop/../accumulo does not exist! Accumulo imports will fail.
+   Please set $ACCUMULO_HOME to the root of your Accumulo installation.
+   14/08/18 14:38:55 INFO sqoop.Sqoop: Running Sqoop version: 1.4.4.2.1.2.1-471
+   14/08/18 14:38:55 WARN tool.BaseSqoopTool: Setting your password on the command-line is 
+   insecure. Consider using -P instead.
+   14/08/18 14:38:55 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+   information_schema
+   test
+   world
+
+# List Tables
+
+   $ sqoop list-tables --connect jdbc:mysql://localhost/world --username sqoop --password sqoop
+   ...
+   14/08/18 14:39:43 INFO sqoop.Sqoop: Running Sqoop version: 1.4.4.2.1.2.1-471
+   14/08/18 14:39:43 WARN tool.BaseSqoopTool: Setting your password on the command-line is
+   insecure. Consider using -P instead.
+   14/08/18 14:39:43 INFO manager.MySQLManager: Preparing to use a MySQL streaming resultset.
+   city
+   country
+   countrylanguage
+
+# Make directory for data
+  
+   hdfs dfs -mkdir sqoop-mysql-import
+
+Simple Table Import
+-------------------
+
+# Import the country table to HDFS, "-m" is number of map tasks (one in this case)
+
+  $ sqoop import --connect jdbc:mysql://localhost/world  --driver com.mysql.jdbc.Driver --username sqoop --password sqoop --table Country  -m 1 --target-dir /user/hands-on/sqoop-mysql-import/country
+  
+   ...
+   14/08/18 16:47:15 INFO mapreduce.ImportJobBase: Transferred 30.752 KB in 12.7348 seconds 
+   (2.4148 KB/sec)
+   14/08/18 16:47:15 INFO mapreduce.ImportJobBase: Retrieved 239 records.
+
+# Check Results in HDFS
+
+   $ hdfs dfs -ls sqoop-mysql-import/country
+   Found 2 items
+   -rw-r--r--   2 hands-on hdfs          0 2017-12-12 12:14 sqoop-mysql-import/country/_SUCCESS
+   -rw-r--r--   2 hands-on hdfs      31490 2017-12-12 12:14 sqoop-mysql-import/country/part-m-00000
+   
+   $ hdfs dfs  -cat sqoop-mysql-import/country/part-m-00000
+   ABW,Aruba,North America,Caribbean,193.0,null,103000,78.4,828.0,793.0,Aruba,Nonmetropolitan 
+   Territory of The Netherlands,Beatrix,129,AW
+   ...
+   ZWE,Zimbabwe,Africa,Eastern Africa,390757.0,1980,11669000,37.8,5951.0,8670.0,Zimbabwe,
+   Republic,Robert G. Mugabe,4068,ZW
+
+Using and Options File
+----------------------
+
+#   Can use an options file to avoid rewriting same options
+#   Example (vi world-import-options.txt):
+
+import
+   --connect
+   jdbc:mysql://localhost/world
+    --driver
+   com.mysql.jdbc.Driver
+   --username
+   sqoop
+   --password
+   sqoop
+
+  $ sqoop  --options-file world-import-options.txt --table City  -m 1 --target-dir /user/hands-on/sqoop-mysql-import/city
+
+Include a SQL Query in the Import Step
+--------------------------------------
+
+# First use a single mapper "-m 1" The $CONDITIONS is required by WHERE, leave blank. 
+
+   $ sqoop  --options-file world-import-options.txt -m 1 --target-dir /user/hands-on/sqoop-mysql-import/canada-city --query "SELECT ID,Name from City WHERE CountryCode='CAN' AND \$CONDITIONS"
+
+# Next, take a look at the results
+
+   $ hdfs dfs  -cat sqoop-mysql-import/canada-city/part-m-00000
+
+   1810,Montréal
+   1811,Calgary
+   1812,Toronto
+   ...
+   1856,Sudbury
+   1857,Kelowna
+   1858,Barrie
+
+Using Multiple Mappers
+----------------------
+
+# The $CONDITIONS variable is needed for more than one mapper.
+# If you want to import the results of a query in parallel, then each map task will need
+# to execute a copy of the query, with results partitioned by bounding conditions inferred
+# by Sqoop. Your query must include the token $CONDITIONS which each Sqoop process will
+# replace with a unique condition expression based on the "--split-by" option.
+# You may need to select another splitting column with --split-by option if your
+# primary key is not uniformly distributed.
+
+# Since -m 1 is one map, we don't need to specify a --split-by option.
+# Now use multiple mappers, clear results from previous import. 
+
+   $ hdfs dfs -rm -r -skipTrash  sqoop-mysql-import/canada-city
+
+   $ sqoop  --options-file world-import-options.txt -m 4 --target-dir /user/hands-on/sqoop-mysql-import/canada-city --query "SELECT ID,Name from City WHERE CountryCode='CAN' AND \$CONDITIONS" --split-by ID
+
+# Next, take a look at the results
+
+   $ hdfs dfs -ls  sqoop-mysql-import/canada-city
+   Found 5 items
+   -rw-r--r--   2 hands-on hdfs     0 2017-12-12 12:23 sqoop-mysql-import/canada-city/_SUCCESS
+   -rw-r--r--   2 hands-on hdfs   175 2017-12-12 12:23 sqoop-mysql-import/canada-city/part-m-00000
+   -rw-r--r--   2 hands-on hdfs   153 2017-12-12 12:23 sqoop-mysql-import/canada-city/part-m-00001
+   -rw-r--r--   2 hands-on hdfs   186 2017-12-12 12:23 sqoop-mysql-import/canada-city/part-m-00002
+   -rw-r--r--   2 hands-on hdfs   182 2017-12-12 12:23 sqoop-mysql-import/canada-city/part-m-00003
+
+# Why is there four "part-m-0000*" files? 
+# Each mapper will write a file to HDFS (remember "-m4") Since we have four mappers, 
+# there will be four files. As before, the file contents can be printed (in this case
+# file "part-m-00001"):
+
+  $ hdfs dfs  -cat sqoop-mysql-import/canada-city/part-m-00001
+
+  1822,Ottawa
+  1823,Laval
+  1824,Surrey
+  ...
+  1831,Burnaby
+  1832,Québec
+  1833,York
+
+Export Data from HDFS to MySQL
+==============================
+
+# Create table for exported data (if an existing table is used it must be empty)
+   MariaDB [(none)]> USE WORLD;
+
+   MariaDB [world]> CREATE TABLE `CityExport` (
+            `ID` int(11) NOT NULL AUTO_INCREMENT,
+            `Name` char(35) NOT NULL DEFAULT '',
+            `CountryCode` char(3) NOT NULL DEFAULT '',
+            `District` char(20) NOT NULL DEFAULT '',
+            `Population` int(11) NOT NULL DEFAULT '0',
+            PRIMARY KEY (`ID`));
+
+# run the Sqoop export command
+
+   $ sqoop --options-file cities-export-options.txt --table CityExport  -m 4 --export-dir /user/hands-on/sqoop-mysql-import/city
+
+# Check table in MariaDB
+
+   mysql> select * from CityExport limit 10;
+   +----+----------------+-------------+---------------+------------+
+   | ID | Name           | CountryCode | District      | Population |
+   +----+----------------+-------------+---------------+------------+
+   |  1 | Kabul          | AFG         | Kabol         |    1780000 |
+   |  2 | Qandahar       | AFG         | Qandahar      |     237500 |
+   |  3 | Herat          | AFG         | Herat         |     186800 |
+   |  4 | Mazar-e-Sharif | AFG         | Balkh         |     127800 |
+   |  5 | Amsterdam      | NLD         | Noord-Holland |     731200 |
+   |  6 | Rotterdam      | NLD         | Zuid-Holland  |     593321 |
+   |  7 | Haag           | NLD         | Zuid-Holland  |     440900 |
+   |  8 | Utrecht        | NLD         | Utrecht       |     234323 |
+   |  9 | Eindhoven      | NLD         | Noord-Brabant |     201843 |
+   | 10 | Tilburg        | NLD         | Noord-Brabant |     193238 |
+   +----+----------------+-------------+---------------+------------+
+   10 rows in set (0.00 sec)
+
+# NOTE: Because multiple mappers were used, it is possible that ID order 
+# in the new table will not be consecutive. 
+
+
+What Are All the Java Programs in My Directory?
+===============================================
+
+# Each time Sqoop runs a map task(s) it creates a Java file that is then used as the mapper.
+# In the course of the above examples, the following files were written
+
+    cityexport.java  city.java  country.java  QueryResult.java
+
+# Once the map is done, these files can be deleted (or inspected if you know Java)
+# You can also add the "--outdir <path> " argument to your options file to direct
+# the Java files to another directory.
+
+
+Some Handy Clean-up Commands
+============================
+
+# Clear the cityexport table
+
+  MariaDB [world]> truncate table CityExport;
+
+# remove the table
+   MariaDB [world]> Drop table CityExport;
+
+# clean-up imported files
+
+   $hdfs dfs -rm -r  -skipTrash sqoop-mysql-import
+

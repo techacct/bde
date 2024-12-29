@@ -1,0 +1,96 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 8.2 NiFi Flow and Web UI Components
+Lesson 8.3 NiFi Web UI Example
+Date: 2022-08
+NiFi Version: 1.17
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta8 (or higher)
+============================================================
+
+Preparation Needed to Run NiFi
+------------------------------
+
+# NiFi can use a lot of system resources and is not started when the LHM starts. 
+# In addition, before starting NiFi, it also a good idea to shutdown some unused 
+# and resource intensive services (HBase and Kafka).
+
+# Perform the following steps to shutdown Kafka and HBase
+# and start NiFi.
+
+# 1. Make sure there are no active Kafka or HBase examples running and
+     the KafkaEsque GUI has been stopped (simply close the KafkaEsque window).
+
+# 2. Promote yourself to "root" (password is "hadoop")
+
+    $ su - root 
+    # systemctl stop hbase
+    # systemctl stop kafka
+
+# 3. Start NiFi 
+
+    # systemctl start nifi
+    # exit
+    $
+
+# 4. Check if Nifi is running by entering the following in a local browser.
+#    IMPORTANT: It may take several minutes for the NiFi interface to start.
+
+  http://localhost:18085/nifi/
+
+# NOTE 1: After a certain amount of idle time the NiFi canvas web UI becomes
+# unresponsive. The page must stopped and restarted (not just reloaded) to bring 
+# the NiFi canvas back into operation.
+#
+# NOTE 2: If you restart the LHM, both Kafka and HBase will be running. NiFi
+# is not started automatically. You will need to go through the
+# above procedure to start NiFi (and shutdown HBase and Kafka if needed)
+
+Place the NiFI-Examples.tgz in /tmp
+-----------------------------------
+
+# Copy the NiFi example to the /tmp directory
+
+  cp NiFi-Examples.tgz /tmp 
+
+Work from nifi account
+======================
+
+# Nifi is run as user nifi. Because some of the examples require reading and
+# writing to the local LHM filesystem (and HDFS) it is easier to run the examples
+# as user nifi. The following steps will make you the nifi user and then allow you
+# to extract Lesson 8.2 and 8.3 files into the /home/nifi directory. All examples 
+# will be run as user nifi. The nifi password is "nifiLHM".
+  
+  $ su - nifi
+  $ whoami
+  nifi
+  $ pwd
+  /home/nifi/
+
+# If you have successfully become the nifi users the whoami and pwd results should
+# be the same as shown above.
+
+# Next extract the examples:
+
+  $ tar xvzf /tmp/NiFi-Examples.tgz
+
+# Continue as user nifi and consult the NOTES.txt file in 
+
+  /home/nifi/Lesson-08-NiFi/8.2-NiFi-Flow-Componentsi/NOTES.txt  
+  /home/nifi/Lesson-08-NiFi/8.3-Nifi-Web-Example/NOTES.txt
+
+
+Restore HBase and Kafka
+========================
+
+# When you are done with Nifi or would like to use HBase or Kafka
+# you can stop NiFi and restart HBase and Kafka as follows:
+
+  $ su - root
+  # systemctl stop nifi
+  # systemctl start hbase
+  # systemctl start kafka
+  # exit
+  $ 

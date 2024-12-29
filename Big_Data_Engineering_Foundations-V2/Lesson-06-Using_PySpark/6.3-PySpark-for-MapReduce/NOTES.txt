@@ -1,0 +1,315 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 6.3 Use PySpark for MapReduce Programing 
+Date: 2021-08
+Spark Version: 2.4.5
+Python Version: 3.7.4
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta7
+============================================================
+
+Background
+==========
+
+# Resilient Distributed Datasets (RDDs) are the fundamental unit of data in Spark.
+# RDDs can be created from a file, from data in memory, or from another RDD. RDDs
+# are immutable.
+
+# Spark has two basic classes of operations
+#
+# 1. transformations - lazy operations that return another RDD.
+#    (map, flatMap, filter, reduceByKey)
+#
+# 2. actions - operations that trigger computation and return values.
+#    (count, collect, take, saveAsTextFile)
+
+Interactive MapReduce Example with PySpark
+==========================================
+
+# RDDs have actions, which return values, and transformations, which return pointers 
+# to new RDDs. Spark performs its calculations, it will not execute any of 
+# the transformations until an action occurs. 
+
+# Copy the war-and-peace.txt file from Lesson 3.2 to the local directory.
+
+  $ cp ../../Lesson-03-Hadoop_HDFS/3.2-HDFS-Command-Line-Tools/data/war-and-peace.txt .
+
+# Make a directory in HDFS and copy the file to that location
+
+  $ hdfs dfs -mkdir books-input
+  $ hdfs dfs -put war-and-peace.txt books-input
+
+# Start the PySpark REPL (Read, Evaluate, Print, Loop)
+
+  $ pyspark
+
+File Input
+----------
+
+# The file war-and-peace.txt is in the local directory and in HDFS
+# in the books-input directory 
+
+# Spark can load from both locations, however, there are
+# advantages in using HDFS that provide more efficient 
+# file input and output in a cluster environment.
+#
+# Another factor the need to have files available on all nodes of the 
+# cluster (not just the edge node). If the cluster is provisioned with 
+# NFS mounted "/home" directories then local access to all user files 
+# will work, however, on many clusters this is not the case and local 
+# user files will not be available on all nodes. In this case, the ONLY way
+# to read and write files using Spark is though HDFS.
+# Both methods will be demonstrated below.
+
+Use PySpark on the LHM 
+----------------------
+# Read a text file (war-and-peace.txt) from local file systems into an RDD (TRANSFORMATION)
+# NOTE: The local filesystem is referenced by using "file:///" followed by the path-name. 
+# The use of three "///" is intentional and required when referring to the local
+# file system.
+
+  >>> text=sc.textFile("file:///home/hands-on/Big_Data_Engineering_Foundations-V1/Lesson-06-Using_PySpark/6.3-PySpark-for-MapReduce/war-and-peace.text")
+
+# Count number of lines (ACTION)
+
+  >>> text.count()
+    ... (poking though error stream, we find)
+    ...
+    Input path does not exist: file:/home/hands-on/Big_Data_Engineering_Foundations-V1/Lesson-06-Using_PySpark/6.3-PySpark-for-MapReduce/war-and-peace.text
+    ...
+    ...
+
+# Yikes! What Happened !
+# TRANSFORMATION worked, but ACTION FAILED!
+# Error was actually in TRANSFORMATION, the file name is wrong! 
+# Such a lot of text for a misspelled filename.
+
+# SOLUTION: Fix the filename (war-and-peace.text --> war-and-peace.txt)
+
+  >>> text=sc.textFile("file:///home/hands-on/Big_Data_Engineering_Foundations-V1/Lesson-06-Using_PySpark/6.3-PySpark-for-MapReduce/war-and-peace.txt")
+
+# ALTERNATIVE: Read from HDFS
+# NOTE: The "hdfs://localhost:9000" is unique to the LHM. On a real cluster
+# the name of namenode may need to be substituted for "localhost." In addition,
+# often times HDFS is the default, and the "hdfs://localhost:9000" is not required.
+# In these lessons we will use both "file:///" and "hdfs://" to be clear about
+# the location of any files that are used.
+
+  >>> text=sc.textFile("hdfs://localhost:9000/user/hands-on/books-input/war-and-peace.txt")
+  >>> text.count()
+  65336
+
+Mapping and Reducing
+=====================
+
+# Word count in spark looks like the following:
+#
+# counts = text.flatMap(lambda line: line.split(" ")). \
+#          map(lambda word: (word, 1)). \
+#          reduceByKey(lambda a, b: a + b)
+
+
+# Uses two kinds of map functions: map and flatmap
+#
+#  map: It returns a new RDD by applying given function to each element of the RDD. 
+#       Function in map returns only one item.
+#
+#  flatMap: Similar to map, it returns a new RDD by applying a function to each 
+#  element of the RDD, but output is flattened. Consider a simple test file:
+
+flatMap vs. map
+===============
+# Use a simple file to see the difference:
+
+  $ cat map-text.txt
+
+    see spot run
+    run spot run
+    see the cat
+
+    # Read local file into MapText RDD
+
+    >>> MapText=sc.textFile("file:///home/hands-on/Big_Data_Engineering_Foundations-V1/Lesson-06-Using_PySpark/6.3-PySpark-for-MapReduce/map-text.txt")
+
+# Inspect file as read:
+
+  >>> MapText.collect()
+  [u'see spot run', u'run spot run', u'see the cat']
+
+# NOTE: "u" means Unicode, can be ignored. Next, do a map to split on spaces, 
+# result is lines broken into words (elements) and sentences still exist (lists) 
+
+  >>> mp=MapText.map(lambda line:line.split(" "))
+  >>> mp.collect()
+  [[u'see', u'spot', u'run'], [u'run', u'spot', u'run'], [u'see', u'the', u'cat']]
+
+# Now try a flatMap to split on spaces, result is lines broken on words (elements) and
+# sentences are gone (flattened to one big list)
+
+  >>> fm=MapText.flatMap(lambda line:line.split(" "))
+  >>> fm.collect()
+  [u'see', u'spot', u'run', u'run', u'spot', u'run', u'see', u'the', u'cat']
+
+# What happened? All structure is gone, just words (because we split on spaces)
+
+What is "lambda"
+===============
+
+# Lambda's are anonymous Python functions (i.e. functions that are not bound to a 
+# name at run-time), lambda variables are anonymous, they do not 
+# relate to the rest of the code, only operate within the scope of the lambda statement
+
+ lambda x, y, z: x + y + z
+ (return is x + y + z)
+
+# apply operation to each map
+# flatMap(lambda line: line.split(" "))
+
+# Recall the Map operation is happening in parallel based on a spark context. 
+# Each has map operation applied to its slice of the RDD. The lambda is applied 
+# to each slice and has no scope outside of the map operation.
+
+Reducing
+========
+
+# Combine values with the same key (a is the the accumulator)
+# reduceByKey(lambda a, b: a + b)
+
+Word Count
+==========
+
+# Put it all together and count all words, split on spaces, i.e. spaces define a word
+
+  >>> counts = text.flatMap(lambda line: line.split(" ")). \
+         map(lambda word: (word, 1)). \
+         reduceByKey(lambda a, b: a + b)
+
+# look at first 5 elements
+
+  >>> counts.take(5)
+  [('The', 2550), ('Project', 78), ('EBook', 2), ('of', 14853), ('Peace,', 2)] 
+
+# Save results in HDFS  
+
+  >>> counts.saveAsTextFile("books-output/war-and-peace-counts")
+
+# Inspect results in HDFS (in another terminal)
+
+  $ hdfs dfs -ls books-output/war-and-peace-counts
+    Found 3 items
+    -rw-r--r--   1 hands-on hadoop          0 2021-10-18 12:24 books-output/war-and-peace-counts/_SUCCESS
+    -rw-r--r--   1 hands-on hadoop     339872 2021-10-18 12:24 books-output/war-and-peace-counts/part-00000
+    -rw-r--r--   1 hands-on hadoop     338025 2021-10-18 12:24 books-output/war-and-peace-counts/part-00001
+  
+
+# Why two files? Because default number of Spark executors is "2"
+# Next, look at top of first file in HDFS
+
+  $ hdfs dfs -head books-output/war-and-peace-counts/part-00000
+  ('The', 2550)
+  ('Project', 78)
+  ('EBook', 2)
+  ('of', 14853)
+  ('Peace,', 2)
+  ('Leo', 4)
+  ...
+  ...
+
+# Get a copy the results to local directory (or save it locally using "file:///").
+
+  $ hdfs dfs -get books-output/war-and-peace-counts war-and-peace-counts
+
+# Check beginning of LOCAL file
+  $ head war-and-peace-counts/part-00000
+  ('The', 2550)
+  ('Project', 78)
+  ('EBook', 2)
+  ('of', 14853)
+  ('Peace,', 2)
+  ('Leo', 4)
+  ...
+  ...
+
+Adding Filters
+--------------
+
+# Modify for single word search "Kutuzov"
+
+  >>> counts = text.flatMap(lambda line: line.split(" ")). \
+           filter(lambda w: "Kutuzov" in w). \
+           map(lambda word: (word, 1)). \
+           reduceByKey(lambda a, b: a + b)
+
+# Show all results
+
+  >>> counts.collect()
+
+  [('Kutuzov...', 1), ('Kutuzov', 327), ('Kutuzov,', 68), ('*Kutuzov.', 1), ('Kutuzov."', 1), ("Kutuzov's,", 2), ('Kutuzov:', 3), ('Kutuzov;', 2), ('Kutuzov!"', 1), ('(Kutuzov', 1), ('Kutuzov--having', 1), ('Dokhturov--Kutuzov', 1), ('happening--Kutuzov', 1), ("Kutuzov's;", 1), ("Kutuzov's", 76), ('Kutuzov!', 1), ('Kutuzov.', 31), ('Kutuzov)', 1), ('Kutuzov?"', 5), ('Kutuzov--the', 1), ('Kutuzov,"', 2), ('Kutuzov?', 1), ("Kutuzov's.", 1)]
+
+# To help read, print results using a loop
+
+  >>> for x in counts.collect(): print (x)
+  ... 
+  ('Kutuzov,', 68)
+  ('Kutuzov', 327)
+  ('Kutuzov:', 3)
+  ('Kutuzov;', 2)
+  ('Kutuzov!"', 1)
+  ('(Kutuzov', 1)
+  ('Kutuzov--having', 1)
+  ('Dokhturov--Kutuzov', 1)
+  ('happening--Kutuzov', 1)
+  ("Kutuzov's;", 1)
+  ('Kutuzov...', 1)
+  ('*Kutuzov.', 1)
+  ('Kutuzov."', 1)
+  ("Kutuzov's,", 2)
+  ("Kutuzov's", 76)
+  ('Kutuzov,"', 2)
+  ('Kutuzov?', 1)
+  ('Kutuzov.', 31)
+  ('Kutuzov?"', 5)
+  ("Kutuzov's.", 1)
+  ('Kutuzov!', 1)
+  ('Kutuzov)', 1)
+  ('Kutuzov--the', 1)
+
+# add a map to replace "," note how (u'Kutuzov,', 68) is now gone 
+# and (u'Kutuzov', 395) has increased.
+
+  >>> counts = text.flatMap(lambda line: line.split(" ")). \
+         filter(lambda w: "Kutuzov" in w). \
+         map(lambda x: x.replace(',','')). \
+         map(lambda word: (word, 1)). \
+         reduceByKey(lambda a, b: a + b)
+
+  >>> for x in counts.collect(): print (x)
+  ... 
+  ('Kutuzov', 395)
+  ('Kutuzov:', 3)
+  ('Kutuzov;', 2)
+  ('Kutuzov!"', 1)
+  ('(Kutuzov', 1)
+  ('Kutuzov--having', 1)
+  ('Dokhturov--Kutuzov', 1)
+  ('happening--Kutuzov', 1)
+  ("Kutuzov's;", 1)
+  ('Kutuzov"', 2)
+  ('Kutuzov...', 1)
+  ('*Kutuzov.', 1)
+  ('Kutuzov."', 1)
+  ("Kutuzov's", 78)
+  ('Kutuzov?', 1)
+  ('Kutuzov.', 31)
+  ('Kutuzov?"', 5)
+  ("Kutuzov's.", 1)
+  ('Kutuzov!', 1)
+  ('Kutuzov)', 1)
+  ('Kutuzov--the', 1)
+
+
+Run Spark Applications Stand Alone 
+==================================
+
+The use of "spark-submit" was covered in Lesson 6.2 using the pi-estimate.py program.

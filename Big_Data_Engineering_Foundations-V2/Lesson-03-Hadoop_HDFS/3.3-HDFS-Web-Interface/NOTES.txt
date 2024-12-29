@@ -1,0 +1,24 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 3.3 Use the HDFS Web Interface 
+
+Date: 2021-07
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta6
+============================================================
+
+# Almost all Hadoop tools provide a web-based interface. 
+# The HDFS NameNode daemon on the Linux Hadoop Minimal (LHM)
+# provides such and interface at port 50070.
+
+# Using a browser on the host system the NameNode
+# web interface on the Linux Hadoop Minimal can be found 
+# by using the following URL in your browser.
+
+  http://127.0.0.1:50070
+
+# The LHM proved several web interfaced. Consult the following for more 
+# information. 
+
+  https://www.clustermonkey.net/scalable-analytics/doku.php?id=linux_hadoop_minimal_installation_instructions_version_2#web_access

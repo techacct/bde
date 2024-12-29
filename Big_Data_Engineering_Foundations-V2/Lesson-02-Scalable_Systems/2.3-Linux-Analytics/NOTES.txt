@@ -1,0 +1,180 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 2.3 Use Linux Command Line Analytics Tools   
+
+Date: 2021-07
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta7
+============================================================
+
+Using Big Data tools will at some point require the use
+of the Linux (or Unix) command line. A full description of
+the command line is beyond the scope of these lessons.
+If you need further background the Linux command line 
+and associated tools, consider "Linux Command Line Complete Video Course"
+by Susan Lauber (ISBN-13: 978-0-13-444577-9)
+
+Top 10 Linux Commands
+=====================
+
+# The following are the most useful Linux commands.
+# There are many more, however, the following commands
+# provide basic file operations and will be used throughout
+# these lessons.
+# your screen.
+
+#   1. man - get the manual for any command (including "man")
+#   2. ls - list the files in a directory
+#   3. pwd - print the current directory (where am I/)
+#   4. cd - change to a new directory
+#   5. cp - copy a file
+#   6. rm - remove a file
+#   7. file - show the file type
+#   8. cat - print a file (concatenate and print)
+#   9. head/tail - show beginning or end of a text file
+#   10. clear/reset - clean up your terminal window
+
+# Finally, the command line based editor, "vi", will be used mostly 
+# as a text file viewer, but is also a useful tool to learn. 
+
+Unix/Linux Tools
+================
+
+The following are basic introduction to several Linux command line tools
+that are useful for data engineering tasks. Often times, a simple change
+may be needed for one or more data files (e.g. CSV files) that can be
+performed directly from the command line without the use of scalable tools.
+Of course, this assumes the files are of a manageable size.
+
+pipe "|" - data flow
+--------------------
+# Unix and Linux are designed to allow many small tools work together to
+# create new functionality. Each "small" tool is very powerful in its
+# domain (has many options). The Unix idea "do one thing well"
+
+# Tools are connected using a "pipe" or "|" or vertical bar.
+
+#   command1->out | input->command2->out | input->command3->out
+
+# The "pipe" command connects two command feeding the output
+# of one command (stdout) to the input (stdin) input of
+# another command. 
+
+# Do not confuse a pipe "|" with I/O redirection ( >, >>, <, 2>, etc)
+# These commands send output (and read) input to (from) files
+
+grep - string search
+--------------------
+# The grep command is useful for finding strings in text files.
+# We will be using the text file "war-and-peace.txt" in these
+# lessons to demonstrate several concepts and methods.
+# 
+# The file is located in "../../Lesson-03-Hadoop_HDFS/3.2-HDFS-Command-Line-Tools/data"
+# relative to the current working directory. First, let's copy the file to our
+# working directory:
+
+  $ cp  ../../Lesson-03-Hadoop_HDFS/3.2-HDFS-Command-Line-Tools/data/war-and-peace.txt .
+
+# NOTE: if the above line is confusing, consider the Linux Command Line course
+# mentioned above. 
+#
+# Next, let's use grep to find the name of a character, General Kutusov in War and Peace.
+
+  $ grep Kutuzov war-and-peace.txt 
+
+# The results produce many lines, pipe "|" the results into "more" to view per page.
+# If we just want to count the lines, pipe to the command "wc -l" (word count command 
+# with report lines option)
+
+  $ grep Kutuzov  war-and-peace.txt |wc -l
+  525
+
+# Count instances of "Kutuzov,"  (Kutuzov followed by a comma)
+
+  $ grep "Kutuzov,"  war-and-peace.txt|wc -l
+  70 
+
+sed - string replacement
+-------------------------
+
+# If we want to eliminate the "," after Kutuzov we can use "sed".
+# sed will substitute the second string for the first
+# in this case substitute "Kutuzov" for "Kutuzov,"
+# The string formats can be complex and will send output
+# to the screen unless (as done below) the output is
+# directed to a file using the redirection ">" operator.
+
+  $ sed 's/Kutuzov,/Kutuzov/' war-and-peace.txt >new-file
+
+# There is much more to understand about sed, here we use the
+# basic functionality. In this case, the command is "substitute" 
+# or "s". The "/" is used as a "separation character" delimiting 
+# the two strings. Note, the use of the single quotes around
+# the substitute command. 
+
+# Now test to see if any "Kutuzov," exist in the new file
+
+  $ grep "Kutuzov," new-file|wc -l 
+  0
+
+gawk - string extraction
+------------------------
+# The "gawk" (or awk) is a very powerful text processing tool. 
+# In this example, it will be used for string extraction from
+# a file or command. For example, gawk can parse the results
+# of the "uptime" command (uptime provides the length of
+# time a Linux server has been running and some other system
+# load data).
+
+# Parse results of "uptime" command and pull out the first number after 
+# "average:" (this number is the 1 minute system load average). For example,
+# the uptime command produces output that looks like:
+
+  $ uptime
+   12:38:17 up  2:03,  2 users,  load average: 0.00, 0.06, 0.14
+
+# Note: the uptime output changes as the length of time increases
+# (i.e it includes a field for "days" if more than one day has passed)
+# The field number may need to be adjusted. The following process illustrates
+# using gawk and sed. First, pipe to sed to clean out the commas. 
+  
+  $ uptime|sed 's/,//g'
+   12:42:17 up  2:07  2 users  load average: 0.14 0.08 0.13
+
+# The trailing "g" in the sed command, means "perform the replacement globally,"
+# without the "g" sed will only replace the first instance on each line.
+
+# Now use gawk to get 1 minute load average (8th field, fields start at 1)  By default,
+# gawk assumes " " (space) as the field separator. We will also remove the "min" 
+# field if it exists (sometimes it doesn't) and commas using two sed stages
+# Notice use of "\" to make sure sed treats next character (a space "\ ")
+# as literal character, not part of the command (in this case the space after min).
+
+  $ uptime|sed 's/min,\ //' |sed 's/,//g'|awk '{print $8}'
+  0.07
+
+# now get 5 minute average (9th field)
+
+  $ uptime|sed s/min,\ // |sed s/,//g|awk '{print $9}'
+  0.84
+
+# Get number of users:
+
+  $ uptime|sed s/min,\ // |sed s/,//g|awk '{print $4}'
+  6
+
+# Get the number of users with the word "users", but use different field separators.  
+# In this case "," (option -F,)
+
+  $ uptime|gawk -F, '{print $2}'
+  6 users
+
+
+Using Unix/Linux Tools in Scripts
+=================================
+
+# Although not covered in these lessons, using Linux tools
+# in shell scripts is a simple yet powerful way perform complex
+# operations on data.
+

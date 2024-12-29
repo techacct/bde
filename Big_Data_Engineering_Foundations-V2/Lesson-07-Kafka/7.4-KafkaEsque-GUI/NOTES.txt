@@ -1,0 +1,33 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 7.3 Kafka Producers and Consumers with Python
+Date: 2022-08
+Kafka Version: 2.12
+KafkaEsque Version: 2.2.2
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta8
+============================================================
+
+# Project Page
+#    https://kafka.esque.at/
+# To use KafkaEsque you must login to the LHM using the "-X" option
+# The "-X" ensures "X forwarding" will work and display on the local machine.
+
+  ssh -X hands-on@127.0.0.1 -p 2222
+
+# On Macintosh systems, you may need to use "-XY"
+
+ ssh -XY hands-on@127.0.0.1 -p 2222
+
+#  Start KafkaEsque as follows.
+  
+  $ kafkaesque
+  Run output is in /home/hands-on/.kafkaesque/kafkaesque.run
+  To stop KafkaEsque, close the application window.
+
+# Note: A wrapper script starts KafkaEsque and places it in
+# the background. It also redirects all run output (INFO messages)
+# to the user's home directory ~/.kafkaesque/kafkaesque.run 
+# The previous kafkaesque.run is overwritten on a new invocation.
+

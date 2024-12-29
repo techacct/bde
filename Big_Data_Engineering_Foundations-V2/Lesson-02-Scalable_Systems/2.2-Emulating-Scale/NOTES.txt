@@ -1,0 +1,59 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 2.2 Emulating Scalable Systems 
+
+Date: 2021-07
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta6
+============================================================
+
+
+# In this lesson, we go over how to login to the LHM and download the lesson
+# notes. To download and install the virtual machine, refer to the following 
+two pages for full documentation (Including video instructions).
+
+https://www.clustermonkey.net/scalable-analytics/doku.php?id=start#linux_hadoop_minimal_lhm_virtual_machine_sandbox
+
+https://www.clustermonkey.net/scalable-analytics/doku.php?id=linux_hadoop_minimal_installation_instructions_version_2
+
+Quick Start Instructions Follow
+===============================
+
+# If you are using Windows, you will need an "ssh client." Either of these listed
+# below will work. They are both freely available at no cost. (MobaXterm is recommended)
+
+#  1. Putty: http://www.putty.org (provides terminal for ssh session)
+#  2. MobaXterm: http://mobaxterm.mobatek.net (provides terminal for 
+#     ssh sessions and allows remote X Windows session)
+
+# Install VirtualBox, download and start the LHM virtual machine.
+# When the VM is started:
+
+# Open a terminal (using Putty or MobaXterm on Windows) and enter the following
+# to log in to the LHM-VM as user "hands-on"  (password="minimal")
+
+  ssh hands-on@127.0.0.1 -p 2222
+
+# Once you are logged in to the LHM-VM, you should see the following prompt string:
+
+  [hands-on@localhost ~]$  
+
+# The "[hands-on@localhost ~]" will not be shown in the rest of the class documentation.
+# A "$" will indicate the prompt string for input.
+
+# To get the Lesson notes into the LHM-VM, pull down and extract the course files
+# (from inside the LHM-VM) as shown below:
+
+  $ wget  --no-check-certificate https://www.clustermonkey.net/download/LiveLessons/Big_Data_Engineering_Foundations/Big_Data_Engineering_Foundations-V1.tgz
+
+# Extract the archive file using the "tar" command:
+
+  $ tar xvzf Big_Data_Engineering_Foundations-V1.tgz
+
+# Verify that you have extracted the course material by listing the directory and
+# archive file.
+
+  $ ls 
+  Big_Data_Engineering_Foundations-V1  Big_Data_Engineering_Foundations-V1.tgz
+

@@ -1,0 +1,251 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 7.2 Basic Kafka Usage Modes
+Date: 2022-08
+Kafka Version: 2.12
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta8 (or higher)
+============================================================
+
+# Please see Lesson 2.2 in Part 1 and the following page for more information
+# on installing and using the Linux Hadoop Minimal (LHM) virtual machine.
+#
+#  https://www.clustermonkey.net/download/LiveLessons/Big_Data_Engineering_Foundations
+
+# Kafka web page 
+#    https://kafka.apache.org/
+
+Creating/Listing/Deleting a Kafka Topic
+========================================
+
+# Create a Kafka topic called test. This version of Kafka requires that communication
+# is done though zookeeper daemon. i.e. in order to talk to Kafka, a daemon called
+# zookeeper is contacted first, it takes the message and sends it to Kafka. On the
+# LHM, this seems weird, but on real systems, zookeeper "knows" where Kafka is running
+# and it is probably not on the edge node.
+#
+
+  $ kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 1 \
+    --partitions 1 --topic test
+ Created topic "test".
+
+Listing current Kafka Topics
+----------------------------
+
+# test for topic "test" (there is also a "__consumer_offsets" topic used by Kafka itself)
+
+   $ kafka-topics.sh --list --bootstrap-server localhost:9092 
+   __consumer_offsets
+   test
+
+Get Information about a Topic
+-----------------------------
+# Information about existing topics can be found using the following commands
+
+  $ kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic test
+  Topic: test	PartitionCount: 1	ReplicationFactor: 1	Configs: 
+  	  Topic: test	Partition: 0	Leader: 0	Replicas: 0	Isr: 0
+
+Deleting a Kafka Topic
+----------------------
+
+# delete a topic (connect-test created below)
+
+  kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic test
+
+# NOTE: When a topic is deleted, the historical indexes for the topic are not 
+# removed. This means the source connect keeps the last read location for the file. 
+# If the topic is created again, the connector waits for new data to show up starting at 
+# a specific character count (index) from the beginning. Basically, recreating a topic
+# is not a good idea. 
+
+
+Kafka Examples
+==============
+
+# In order to perform the basic Kafka example, it is
+# very important that you have at least FOUR terminal
+# windows open to work through the examples. 
+# In the examples below Each window will
+# be designated by TERMINAL 1, 2, 3, or 4
+
+Background
+---------
+# The Kafka Broker is already running. These examples use
+# some convenience scripts to  connect to the Kafka broker 
+# to find out information and create simple producers and consumers
+#    kafka-topics.sh
+#    kafka-console-producer.sh
+#    kafka-console-consumer.sh
+#    connect-standalone.sh
+
+Example 1: Create a simple Kafka Producer and Consumer
+-----------------------------------------------------
+# In this example we will use the broker-list option to contact Kafka, 
+# the option is 0.0.0.0:9092 which means any host can contact the broker
+# on port 9092 
+
+TERMINAL WINDOW 1
+-----------------
+# In this terminal we will use the command line terminal (stdin)
+# as a PRODUCER (i.e. Kafka will capture what we type)
+# Enter the following command 
+
+   $ kafka-console-producer.sh --broker-list 0.0.0.0:9092 --topic test
+
+# ">" prompt will be displayed.
+
+# IMPORTANT: enter "ctrl-d" to stop and exit the program
+
+TERMINAL WINDOW 2
+-----------------
+# In this terminal, start a CONSUMER to read messages you typed in TERMINAL 1
+# that Kafka has received under topic "test"
+
+  $ kafka-console-consumer.sh --bootstrap-server 0.0.0.0:9092 --topic test --from-beginning
+
+# IMPORTANT: use "ctrl-c" to stop the program.
+
+Go Back to TERMINAL WINDOW 1
+----------------------------
+
+# Type in the screen at ">" prompt. After you enter a "return," you should see
+# the text in TERMINAL WINDOW 2
+
+Stopping the Programs
+--------------------
+# In TERMINAL 1, enter "ctrl-d"
+# In TERMINAL 2, enter "ctrl-c"
+
+
+Example 2: Connection Test
+--------------------------
+# Kafka can watch files that change over time (e.g. a log file)
+# In this example we are going to create a new topic "monkeys" and 
+# read/watch a file and record changes
+
+# create the message file so the producer looking for the file
+# does not complain
+
+  echo "BEGIN" >monkeyFile.txt
+
+# Use a script to update the input file
+# The file could be a log file or output from an application
+
+    #!/bin/bash
+    # A simple nonsense script to generate 100 messages at random times 
+    # between 2 and 10 seconds
+    for I in `seq 1 100`; do
+      SLEEPTIME=$(shuf -i2-10 -n1)
+      echo "Message: $I Monkeys jumping on the bed, $SLEEPTIME fell off and bumped their head" >>monkeyFile.txt
+      fortune >>monkeyFile.txt
+      sleep $SLEEPTIME
+    done
+
+
+# Now test the stream
+
+TERMINAL WINDOW 1 
+-----------------
+# Create the monkeys topic
+
+  $ kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 1 \
+    --partitions 1 --topic monkeys
+
+# Start the producer (it will watch the file "monkeyFile.txt")
+# use control-c to stop, but keep running for next segment
+
+  connect-standalone.sh config/connect-standalone.properties config/connect-file-source.properties
+
+# The topic and file are specified in config/connect-file-source.properties
+# For example in connect-file-source.properties
+#   file=monkeyFile.txt
+#   topic=monkeys
+
+
+TERMINAL WINDOW 2 
+-----------------
+# show the messages to the console consumer
+# use control-c to stop when finished
+
+  $ kafka-console-consumer.sh --bootstrap-server 0.0.0.0:9092 --topic monkeys --from-beginning
+
+TERMINAL WINDOW 3
+-----------------
+# start generating the monkeyFile.txt
+
+   $ sh create-monkeyFile.sh
+
+# Enter "ctrl-c" to stop when finished
+
+Go Back to TERMINAL 2
+---------------------
+# watch as Kafka collects messages from the monkeyFile.txt
+
+Stopping the Programs
+--------------------
+# In TERMINAL 1, do nothing keep it running
+# In TERMINAL 2, enter "ctrl-c" to stop the console consumer
+# In TERMINAL 3, enter "ctrl-c" to stop generating the monkeyFile.txt file
+
+How to Clear Messages in a Topic
+================================
+
+# Kafka default time for keeping messages is 1 week. In cases where you are debugging
+# or developing, it may be useful to clear the Kafka logs (i.e. the data Kafka has 
+# stored) To clear the message log for a topic you can reset the retention time, wait,
+# and reset the retention time (yes, it is cumbersome, but Kafka is designed to
+# not loose any data) The Kafka logs can vary by systems, on the LHM, Kafka logs 
+# are located in:
+#
+#    /var/data/kafka/kafka-logs
+
+Clearing the test data
+----------------------
+# check for data in logs e.g. test log (NOTE "test-0" and log has 865 bytes)
+
+  $ ls -l /var/data/kafka/kafka-logs/test-0/*.log
+  -rw-r--r-- 1 kafka hadoop 865 Jul 20 11:50 /kafka-logs/test-0/00000000000000000022.log
+
+# Set the retention.ms to one second (ignore warning for now)
+
+  $ kafka-topics.sh --zookeeper localhost:2181 --alter --topic test --config retention.ms=1000
+  WARNING: Altering topic configuration from this script has been deprecated and may be
+  removed in future releases.
+  Going forward, please use kafka-configs.sh for this functionality
+  Updated config for topic "test".
+
+# WAIT SEVERAL MINUTES! and check with "ls" command when log is 0 bytes or use 
+# "watch ls -l /var/data/kafka/kafka-logs/test-0/*.log":
+
+  $ ls -l /var/data/kafka/kafka-logs/test-0/*.log
+  -rw-r--r-- 1 kafka hadoop 0 Jul 23 11:23 /kafka-logs/test-0/00000000000000000039.log
+
+# When log is clear, reset retention time (again ignore warning)
+
+  $ kafka-topics.sh --zookeeper localhost:2181 --alter --topic test --delete-config retention.ms
+  WARNING: Altering topic configuration from this script has been deprecated and may be 
+  removed in future releases.
+  Going forward, please use kafka-configs.sh for this functionality
+  Updated config for topic "test".
+
+The Nuclear Option
+------------------
+# If you need to start all over, perform the following. 
+# You must do this as the root user.
+
+# ALL KAFKA DATA WILL BE LOST
+
+   $ su -
+   Password: 
+   # systemctl stop kafka
+   # /bin/rm -r /var/data/kafka/zookeeper/version-2/*
+   # /bin/rm -r /var/data/kafka/kafka-logs/*
+   # /bin/rm /tmp/connect.offsets 
+   # /bin/rm -r /tmp/hsperfdata_kafka/
+   # /bin/rm -r  /opt/kafka_2.12-2.5.0/logs/*
+   # systemctl start kafka
+   # exit
+   $
+

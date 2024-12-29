@@ -1,0 +1,340 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 6.3 Run PySpark Examples Using Zeppelin Notebook
+Date: 2021-08
+Spark Version: 2.4.5
+Python Version: 3.7.4
+Zeppelin Version: 0.8.2
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta7
+============================================================
+
+# This Lesson is run using the Zeppelin web notebook.
+# The following provides a command line version for 
+# some of the examples.
+
+Import a CSV File into Spark DataFrame 
+======================================
+
+# Reading CSV files into PySpark is straight forward  Consider
+# the simple CSV file, names.csv (The "head" command provides
+# the first 10 lines) There is a header line and followed by
+# data
+
+  $ head names.csv 
+  EmployeeID,FirstName,Title,State,Laptop
+  10,Andrew,Manager,DE,PC
+  11,Arun,Manager,NJ,PC
+  12,Harish,Sales,NJ,MAC
+  13,Robert,Manager,PA,MAC
+  14,Laura,Engineer,PA,MAC
+  15,Anju,CEO,PA,PC
+  16,Aarathi,Manager,NJ,PC
+  17,Parvathy,Engineer,DE,MAC
+  18,Gopika,Admin,DE,MAC
+
+# Make a directories and copy files into HDFS
+
+  $ hdfs dfs -mkdir CSV-Files
+  $ hdfs dfs -put names.csv even-more-names.csv  CSV-Files
+  $ hdfs dfs -mkdir TSV-Files
+  $ hdfs dfs -put more-names.tsv TSV-Files
+
+Using the Cluster
+-----------------
+# From the PySpark interactive shell (CLUSTER)
+
+  >>> df = spark.read.csv("CSV-Files/names.csv")
+
+Using the LHM
+-------------
+# From the PySpark interactive shell (LHM)
+  >>> df_csv = spark.read.csv("hdfs://localhost:9000/user/hands-on/CSV-Files/names.csv")
+
+Checking the DataFrame
+----------------------
+
+# print the table schema, but everything is default "string"
+  >>> df_csv.printSchema()
+  root
+   |-- _c0: string (nullable = true)
+   |-- _c1: string (nullable = true)
+   |-- _c2: string (nullable = true)
+   |-- _c3: string (nullable = true)
+   |-- _c4: string (nullable = true)
+
+# The first five data rows with the pesky header as
+# part of the data
+
+  >>> df_csv.show(5)
+  +----------+---------+-------+-----+------+
+  |       _c0|      _c1|    _c2|  _c3|   _c4|
+  +----------+---------+-------+-----+------+
+  |EmployeeID|FirstName|  Title|State|Laptop|
+  |        10|   Andrew|Manager|   DE|    PC|
+  |        11|     Arun|Manager|   NJ|    PC|
+  |        12|   Harish|  Sales|   NJ|   MAC|
+  |        13|   Robert|Manager|   PA|   MAC|
+  +----------+---------+-------+-----+------+
+  only showing top 5 rows
+
+Removing the Header Line
+------------------------
+
+# The header line can be removed by using the "header='True'" option.
+
+
+  >>> df_csv = spark.read. \
+  options(header='True'). \
+  csv("hdfs://localhost:9000/user/hands-on/CSV-Files/names.csv")
+
+# Header has become column names
+  
+  >>> df_csv.show(5)
+  +----------+---------+--------+-----+------+
+  |EmployeeID|FirstName|   Title|State|Laptop|
+  +----------+---------+--------+-----+------+
+  |        10|   Andrew| Manager|   DE|    PC|
+  |        11|     Arun| Manager|   NJ|    PC|
+  |        12|   Harish|   Sales|   NJ|   MAC|
+  |        13|   Robert| Manager|   PA|   MAC|
+  |        14|    Laura|Engineer|   PA|   MAC|
+  +----------+---------+--------+-----+------+
+  only showing top 5 rows
+
+Infer the Schema
+----------------
+
+# PySpartk can infer the data schema by adding the inferSchema='True' option
+
+  >>> df_csv = spark.read. \
+  options(header='True',inferSchema='True'). \
+  csv("hdfs://localhost:9000/user/hands-on/CSV-Files/names.csv")
+
+  >>> df_csv.printSchema()
+  root
+   |-- EmployeeID: integer (nullable = true)
+   |-- FirstName: string (nullable = true)
+   |-- Title: string (nullable = true)
+   |-- State: string (nullable = true)
+   |-- Laptop: string (nullable = true)
+
+# The delimiter can also be changed, in that case of tab delimiters
+
+  >>> df2_csv = spark.read. \
+  options(header='True',inferSchema='True',delimiter='\t'). \
+  csv("hdfs://localhost:9000/user/hands-on/TSV-Files/more-names.tsv")
+
+  >>> df2_csv.show(5)
+  +----------+---------+--------+-----+------+
+  |EmployeeID|FirstName|   Title|State|Laptop|
+  +----------+---------+--------+-----+------+
+  |        30|     Bill|   Sales|   PA|   MAC|
+  |        31|    Linda| Manager|   NJ|    PC|
+  |        32|     Mary|   Sales|   NJ|   MAC|
+  |        33|     Jill| Manager|   PA|    PC|
+  |        34|    Laura|Engineer|   PA|   MAC|
+  +----------+---------+--------+-----+------+
+  only showing top 5 rows
+
+  >>> df2_csv.printSchema()
+  root
+   |-- EmployeeID: integer (nullable = true)
+   |-- FirstName: string (nullable = true)
+   |-- Title: string (nullable = true)
+   |-- State: string (nullable = true)
+   |-- Laptop: string (nullable = true)
+
+Read all CSV Files in a Directory
+---------------------------------
+# Note schema must be the same
+
+  >>> df_csv = spark.read. \
+  options(header='True',inferSchema='True'). \
+  csv("hdfs://localhost:9000/user/hands-on/CSV-Files/")
+  >>> df_csv.show(50)
+  +----------+---------+--------+-----+------+
+  |EmployeeID|FirstName|   Title|State|Laptop|
+  +----------+---------+--------+-----+------+
+  |        10|   Andrew| Manager|   DE|    PC|
+  |        11|     Arun| Manager|   NJ|    PC|
+  |        12|   Harish|   Sales|   NJ|   MAC|
+
+  ...
+
+  |        42|     Rita|   Sales|   DE|   MAC|
+  |        43|     Mike| Manager|   PA|    PC|
+  |        44|    Vicky|Engineer|   NJ|   MAC|
+  |        45|    Ralph|   Sales|   PA|    PC|
+  +----------+---------+--------+-----+------+
+
+Create a Schema for Reading
+---------------------------
+# A direct schema can be crated for the read operation. 
+# Import some type definitions
+
+  >> from pyspark.sql.types import StructType,StringType, IntegerType
+
+# Define the schema
+
+  >>> schema = StructType() \
+      .add("EmployeeID",IntegerType(),True) \
+      .add("FirstName",StringType(),True) \
+      .add("Title",StringType(),True) \
+      .add("State",StringType(),True) \
+      .add("Laptop",StringType(),True) 
+
+# Load the data
+
+  >>> df_csv = spark.read. \
+     options(header='True').schema(schema). \
+     csv("hdfs://localhost:9000/user/hands-on/CSV-Files/")
+
+# Check the Schema
+
+  >>> df_csv.printSchema()
+  root
+   |-- EmployeeID: integer (nullable = true)
+   |-- FirstName: string (nullable = true)
+   |-- Title: string (nullable = true)
+   |-- State: string (nullable = true)
+   |-- Laptop: string (nullable = true)
+
+
+SQL Query on a DataFrame
+========================
+
+# First, register it as an SQL table to all SQL queries can be used
+# (PySpark also support "spark" queries on DataFrames)
+# Note the use of the "spark" SparkSession is equivalent to the
+# previous SQLContext in version 1.
+
+  >>> df_csv.registerTempTable('csv_table')
+
+
+  >>> spark.sql("SELECT FirstName FROM csv_table WHERE Laptop = 'MAC'").show()
+  +---------+
+  |FirstName|
+  +---------+
+  |   Harish|
+  |   Robert|
+  |    Laura|
+  | Parvathy|
+  |   Gopika|
+  |   Steven|
+  |   Sanker|
+  |   Nirmal|
+  |    jinju|
+  |    Larry|
+  |     Rita|
+  |    Vicky|
+  +---------+
+
+# Find the name and position of all employees from NJ
+
+  >>> spark.sql("SELECT FirstName,Title FROM csv_table WHERE State = 'NJ'").show()
+  +---------+-------+
+  |FirstName|  Title|
+  +---------+-------+
+  |     Arun|Manager|
+  |   Harish|  Sales|
+  |  Aarathi|Manager|
+  |     Hari|  Admin|
+  |   Sanker|  Admin|
+  |    Nancy|  Admin|
+  +---------+-------+
+
+
+Mapping on a DataFrame
+----------------------
+# Use a Map function to create a new EmployeeID (old # plus 1000)
+#   1. Convert DataFrame to RDD
+#   2. Map using Lambda for each element, create new element "x["EmployeeID"]+1000"
+#   3. Write to new DataFrame and add "New EEID" column
+#   4. Can change names of columns EmployeeID-->EEID, Laptop-->Device
+#   5. And, drop the old EEID column
+
+  >>> df_new = df_csv.rdd\
+    .map(lambda x: (x["EmployeeID"], x["FirstName"], x["Title"], \
+         x["State"], x["Laptop"], x["EmployeeID"]+1000))\
+    .toDF(["EEID","FirstName", "Title", "State","Device","New EEID"]) \
+    .drop("EEID")
+
+  >>> df_new.show(5)
+  +---------+--------+-----+------+--------+
+  |FirstName|   Title|State|Device|New EEID|
+  +---------+--------+-----+------+--------+
+  |   Andrew| Manager|   DE|    PC|    1010|
+  |     Arun| Manager|   NJ|    PC|    1011|
+  |   Harish|   Sales|   NJ|   MAC|    1012|
+  |   Robert| Manager|   PA|   MAC|    1013|
+  |    Laura|Engineer|   PA|   MAC|    1014|
+  +---------+--------+-----+------+--------+
+  only showing top 5 rows
+
+
+Saving Dataframes and Working with Hive
+=======================================
+
+# The following examples will illustrate how to exchange data between PySpark (Spark) 
+# and Hive. Previous versions of Spark and Hive have enjoyed a synergistic relationship 
+# where each could effectively read and write the others tables.
+#
+# Recent versions and distributions, however, have limited the ability (for security 
+# reasons) to use each others metastore (A database “catalog” where data about tables 
+# are stored). There are some solutions (The Hortonworks/Cloudera Hive Warehouse 
+# Connector, HWC), however, installing and using the base packages for Hive and Spark 
+# found on the http://apache.org website does not allow sharing metadata and thus tables.
+
+# In order to provide a usable (and portable) framework for data exchange between PySpark
+# (Spark), Hive, an other tools the following examples are provided. While CSV is always
+# portable, the open source Apache Parquet format is much more efficient and supported 
+# throughout the Hadoop ecosystem. In particular, Apache Parquet is designed for 
+# efficient as well as performant flat columnar storage format of data compared to i
+# row based files like CSV or TSV files.
+
+#  * Save a PySpark dataframe in CSV format
+#  * Save a PySpark dataframe in Parquet format
+#  * Use a Hive External Table to Load Parquet Data from PySpark
+#  * Saving Hive Tables to CSV
+#  * Saving Hive Tables to Parquet
+#  * Load a Parquet table into PySpark
+
+
+Saving Data Frames as CSV
+=========================
+
+# A Data Frame can be saved as a CSV file
+# The PySpark DataFrameWriter also has several modes.
+
+#    "overwrite" mode is used to overwrite the existing file.
+#    "append" will to add the data to the existing file.
+#    "ignore" will ignore write operation when the file already exists.
+#    "error" returns an error when file exists (default)
+# While writing a CSV file you can use several options. 
+#    " header" to output the DataFrame column names
+#    "delimiter" to specify the delimiter for the CSV output file.
+
+  >>> df_new.write.mode('overwrite'). \
+  options(header='True', delimiter='|'). \
+  csv("hdfs://localhost:9000/user/hands-on/CSV-Files/output")
+
+# From a command line prompt, check HDFS for the files that are written
+
+  $ hdfs dfs -ls CSV-Files/output
+  Found 2 items
+  -rw-r--r--  3 hands-on hadoop   0 2021-02-18 12:43 CSV-Files/output/_SUCCESS
+  -rw-r--r--  3 hands-on hadoop 534 2021-02-18 12:43 CSV-Files/output/part-00000-e305c249-4dd2-4521-be40-4179b421a056-c000.csv
+
+# Now see what the file actually looks like
+  
+  $ hdfs dfs -cat CSV-Files/output/part-00000-e305c249-4dd2-4521-be40-4179b421a056-c000.csv
+  FirstName|Title|State|Device|New EEID
+  Andrew|Manager|DE|PC|1010
+  Arun|Manager|NJ|PC|1011
+  Harish|Sales|NJ|MAC|1012
+  Robert|Manager|PA|MAC|1013
+
+
+*** See the "PySpark with CSV Files and Hive Tables" Zeppelin Notebook for more examples

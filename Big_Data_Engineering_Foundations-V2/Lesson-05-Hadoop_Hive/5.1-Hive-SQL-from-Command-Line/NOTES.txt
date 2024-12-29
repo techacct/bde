@@ -1,0 +1,193 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 5.1 Run a Hive SQL example using the Command Line
+Date: 2021-08
+Hive Version: 3.1.2
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta7
+============================================================
+
+# Apache Hive examples
+# source
+#   https://cwiki.apache.org/confluence/display/Hive/GettingStarted
+# Hortonworks Hive Cheat Sheet for SQL users
+#   https://www.clustermonkey.net/download/Hands-on_Hadoop_Spark/Supporting-Docs/Hortonworks.CheatSheet.SQLtoHive.pdf
+
+# NOTE: Hive can use different MapReduce libraries. There are three options:
+# traditional MapReduce, Tez, or Spark. For these examples, traditional
+# MapReduce is used so that the job can be easily viewed using 
+# the Yarn Jobs web interface (http://127.0.0.1:8088).
+
+# Hive tables have two main types: Internal (or Managed) and External
+# 
+#  Internal - all data and metadata part of table in HDFS 
+#             (stored in selected Hive format) When an Internal table is dropped
+#             all data go away. Use "CREATE TABLE ..."
+#  External - all data are kept external to Hive. Hive only owns metadata about 
+#             the table. When External table is dropped
+#             data are not lost but remain in HDFS. Use "CREATE EXTERNAL TABLE ..."
+#
+# Start the hive interpreter from the command line
+
+  hive
+
+# The hive prompt on the LHM will be "hive> "
+# NOTE: The Hive prompt on other installations may look like "jdbc:hive2:"
+
+# Very simple test:
+
+  hive> CREATE TABLE pokes (foo INT, bar STRING);
+  hive> SHOW TABLES;
+  hive> DROP TABLE pokes;
+
+# exit hive
+  hive> exit;
+
+# A more detailed example transforming 100 thousand movie rating/attendance
+# records from unixtime format (seconds since 1970-01-01) to a day-of-week
+# format. The original data consists of four columns:
+
+	userid	movieid	rating	unixtime  
+
+# The raw data look like the following (tab separated):
+# 
+	196	242	3	881250949
+	186	302	3	891717742
+	22	377	1	878887116
+	244	51	2	880606923
+	(...)
+#
+# NOTE: Use 'date -d @"unixtime"' to find the actual date and time.
+#
+# The unixtime is impossible for humans to understand. This example
+# will convert the date to the following:
+# 
+	userid movieid rating weekday 
+#
+# Where weekday is the ISO day of week (Monday=1, Tuesday=2, etc.)
+# The data are provided in the example directory, however, you may download 
+# and extract the data yourself.
+
+  mkdir example
+  wget http://files.grouplens.org/datasets/movielens/ml-100k.zip -P example/
+  cd example
+  unzip ml-100k.zip
+
+# As with all Hadoop processing, the data need to be placed into HDFS
+
+  cd example
+  hdfs dfs -mkdir ml-100k
+  hdfs dfs -put ml-100k/u.data ml-100k
+
+# Before we use Hive, create a short Python program (in the example directory)
+# called weekday_mapper.py to do the conversion. 
+#
+
+import sys
+import datetime
+
+for line in sys.stdin:
+  line = line.strip()
+  userid, movieid, rating, unixtime = line.split('\t')
+  weekday = datetime.datetime.fromtimestamp(float(unixtime)).isoweekday()
+  print '\t'.join([userid, movieid, rating, str(weekday)])
+
+# NOTE: The above Python is a Python2 syntax. The LHM actually has
+# two Python versions /usr/bin/python (V2.7.5, default with CentOS7)
+# and /opt/anaconda3/bin/python (V3.7.4). When running Hive, it will 
+# default to the CentOS7 system python V2.7.5)
+
+# Next, start Hive and create the data table (u_data) by entering the following 
+# at the hive> prompt.
+
+CREATE TABLE u_data (
+  userid INT,
+  movieid INT,
+  rating INT,
+  unixtime STRING)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t'
+STORED AS TEXTFILE;
+
+# The movie data are loaded into the table with following command.
+
+  hive> LOAD DATA INPATH '/user/hands-on/ml-100k/u.data' OVERWRITE INTO TABLE u_data;
+
+# The number of rows in the table can be reported by entering:
+#
+
+  hive > SELECT COUNT(*) FROM u_data;
+
+# The command will start a single MapReduce job and should finish with the following lines (or similar)
+ [...]
+
+MapReduce Jobs Launched: 
+Stage-Stage-1: Map: 1  Reduce: 1   Cumulative CPU: 2.26 sec   HDFS Read: 1979380 HDFS Write: 7 SUCCESS
+Total MapReduce CPU Time Spent: 2 seconds 260 msec
+OK
+100000
+Time taken: 28.366 seconds, Fetched: 1 row(s)
+
+# Now that the table data are loaded, use the following command to make the 
+# new table (u-data_new).
+
+  hive> CREATE TABLE u_data_new (
+  userid INT,
+  movieid INT,
+  rating INT,
+  weekday INT)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\t';
+
+# On LHM the local path will work 
+ 
+  hive> add FILE weekday_mapper.py;
+
+# Once weekday_mapper.py is successfully loaded the transformation query can be entered.
+
+  hive> INSERT OVERWRITE TABLE u_data_new
+SELECT
+  TRANSFORM (userid, movieid, rating, unixtime)
+  USING 'python weekday_mapper.py'
+  AS (userid, movieid, rating, weekday)
+FROM u_data;
+
+# If the transformation was successful, the following final portion of the output 
+# should be displayed.
+ [...]
+Table default.u_data_new stats: [numFiles=1, numRows=100000, to-talSize=1179173, rawDataSize=1079173]
+MapReduce Jobs Launched: 
+Stage-Stage-1: Map: 1   Cumulative CPU: 3.44 sec   HDFS Read: 1979380 HDFS Write: 1179256 SUCCESS
+Total MapReduce CPU Time Spent: 3 seconds 440 msec
+OK
+Time taken: 24.06 seconds
+
+# The final query will sort and group the reviews by weekday. 
+
+  hive> SELECT weekday, COUNT(*) FROM u_data_new GROUP BY weekday;
+
+# Final output for the review counts by weekday should look like the following.
+[...]
+MapReduce Jobs Launched: 
+Stage-Stage-1: Map: 1  Reduce: 1   Cumulative CPU: 2.39 sec   HDFS Read: 1179386 HDFS Write: 56 SUCCESS
+Total MapReduce CPU Time Spent: 2 seconds 390 msec
+OK
+1	13278
+2	14816
+3	15426
+4	13774
+5	17964
+6	12318
+7	12424
+Time taken: 22.645 seconds, Fetched: 7 row(s)
+
+# As shown previously, the tables can be removed used using DROP TABLE command. 
+# In this case, using the “-e” command line option (command must be a quoted string).
+
+  hive -e 'drop table u_data_new; drop table u_data'
+
+# Run the same commands from a file, "hive-example.sql" using the -f option:
+
+  hive -f hive-example-LHM.sql 
+

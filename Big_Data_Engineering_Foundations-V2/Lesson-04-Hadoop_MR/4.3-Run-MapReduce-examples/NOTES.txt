@@ -1,0 +1,237 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 4.3 Run MapReduce Examples 
+Date: 2021-08
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta6
+============================================================
+
+# These notes explain how to run some of the Hadoop MapReduce examples
+# on the Linux Hadoop Minimal. Keep in mind, not all examples
+# will be able to run due to data sizes.
+
+HDFS vs hdfs
+------------
+# To avoid confusion when these notes refer to "Hadoop Distributed File System"
+# the abbreviation "HDFS" will be used. When HDFS commands are presented
+# the lower case will be used i.e. "hdfs dfs -ls"
+
+Possible Examples
+=================
+# For convenience and to keep the command lines short, we can assign
+# the environment variable $EXAMPLES to hold the path to example jars. 
+# The assignment only needs to be done once per session.
+
+  $ export EXAMPLES=/opt/hadoop-3.3.0/share/hadoop/mapreduce
+
+# A full list of the possible Hadoop examples can be found by
+# running the examples jar with no arguments.
+
+  $ yarn jar  $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar
+
+# In this lesson three examples will be demonstrated.
+
+#   1. pi: A map/reduce program that estimates Pi using a quasi-Monte Carlo method.
+#   2. wordcount: A map/reduce program that counts the words in the input files.
+#   3. terasort suite (teragen: Generate data for the terasort; terasort: Run 
+#      the terasort; teravalidate: Checking results of terasort
+
+Running Examples on The LHM
+===========================
+
+Calculate Pi
+------------
+
+# The following is a short test that will estimate the value of Pi
+# on the LHM-VM. There are no files read or written. The estimate uses
+# the "random dart" Pi calculation method. There are
+# two arguments, the number of "mappers" to use and the
+# number of guesses for each Mapper. In the following
+# example there are 8 mappers and 8000 guesses in each mapper.
+
+# If you increase the number of maps (8) or the number 
+# of guesses (1000) then the application will take longer and the
+# estimate will improve. 
+
+# Also assign the $EXAMPLES environment
+# variable that holds the path to example jars. (only needs
+# to be done once)
+
+  $ export EXAMPLES=/opt/hadoop-3.3.0/share/hadoop/mapreduce
+
+  $ yarn jar $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar pi 8 1000
+
+    Number of Maps  = 8
+    Samples per Map = 1000
+    .
+    .  (lots of text, may take some time)
+    .
+    Job Finished in 48.406 seconds
+    Estimated value of Pi is 3.14100000000000000000
+
+Word Counting
+-------------
+# Another classic Hadoop example is word counting. 
+# the Hadoop MapReduce wordcount example will count the 
+# number of times a word appears in file (or group of files)
+# the following steps run a simple word count example:
+
+# First, generate a small file with some words:
+
+  $ yarn jar $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar >words.txt
+
+# Next make directories in HDFS
+
+  $ hdfs dfs -mkdir wordcount
+  $ hdfs dfs -mkdir wordcount/in
+
+# copy the word file to HDFS
+
+  $ hdfs dfs -put words.txt wordcount/in
+
+# Run the wordcount example
+
+  $ yarn jar $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar wordcount wordcount/in wordcount/out
+
+# What files did word count produce in HDFS:
+
+  $ hdfs dfs -ls wordcount/out
+
+    -rw-r--r--   1 hands-on hadoop          0 2021-01-29 15:52 wordcount/out/_SUCCESS
+    -rw-r--r--   1 hands-on hadoop       6261 2021-01-29 15:52 wordcount/out/part-r-00000
+
+# What is in the "part-r-00000" file?
+
+  $ hdfs dfs -cat wordcount/out/part-r-00000
+    10GB	2
+    A	15
+    Aggregate	2
+    An	5
+    ... (more text)
+    writer.	1
+    writes	2
+    written	1
+    ...
+    ...
+
+# Hadoop (and Spark) work with "INPUT DIRECTORIES" not files. Note that the argument 
+# given to wordcount was a directory NOT the "words.txt" file. We can add more files
+# to the input directory and word count will ingest all the files it finds. 
+# For instance, create another file (morewords.txt) and place in the 
+# "wordcount/in" directory in HDFS
+
+  $ man ls >morewords.txt
+  $ hdfs dfs -put morewords.txt wordcount/in
+
+# Run wordcount with the new data:
+  $ yarn jar $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar wordcount wordcount/in wordcount/out
+
+    2021-01-29 15:49:13,969 INFO client.DefaultNoHARMFailoverProxyProvider: Connecting to ResourceManager at /0.0.0.0:8032
+    org.apache.hadoop.mapred.FileAlreadyExistsException: Output directory hdfs://localhost:9000/user/hands-on/wordcount/out already exists
+	at org.apache.hadoop.mapreduce.lib.output.FileOutputFormat.checkOutputSpecs(FileOutputFormat.java:164)
+	at org.apache.hadoop.mapreduce.JobSubmitter.checkSpecs(JobSubmitter.java:277)
+	at org.apache.hadoop.mapreduce.JobSubmitter.submitJobInternal(JobSubmitter.java:143)
+	at org.apache.hadoop.mapreduce.Job$11.run(Job.java:1576)
+	at org.apache.hadoop.mapreduce.Job$11.run(Job.java:1573)
+(...)
+	at org.apache.hadoop.util.RunJar.run(RunJar.java:323)
+	at org.apache.hadoop.util.RunJar.main(RunJar.java:236)
+
+What Happened?
+--------------
+
+# When Hadoop has an error, lots of messages are printed along with the command stack trace. 
+# RULE NUMBER ONE: Don't panic. 
+
+# There is usually a human readable error message in there some place. 
+# In the case above:
+
+    Output directory hdfs://localhost:9000/user/hands-on/wordcount/out already exists
+
+# Hadoop and Spark are adamant about NOT overwriting data and will tell you when 
+# you try to do it.
+
+# RULE NUMBER TWO: If you can't understand the the error message, you are probably not the
+# first person to encounter the error, a quick search on the internet often helps find 
+# the cause.
+
+Solution: Remove the Output Directory
+-------------------------------------
+# Remove the output directory and re-run the wordcount program
+
+  $ hdfs dfs -rm -r wordcount/out
+  $ yarn jar $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar wordcount wordcount/in wordcount/out
+
+# Take a look at the results, there are new words.
+
+  $ hdfs dfs -cat wordcount/out/part-r-00000
+    '*'	1
+    '--block-size=M'	1
+    'always'	1
+    'auto',	1
+    'date';	1
+  (...)
+    you	2
+    your	1
+    ~	1
+    B)	1
+
+Run the Terasort Benchmark
+--------------------------
+
+# Terasort is used to measure the raw sorting power of Hadoop MapReduce.
+# Though it is of no practical use, it can provide an indication
+# of how fast your cluster can process data. 
+
+# For the LHM example, 500MBytes of data will be sorted (larger amounts
+# may take a long time and overwhelm the virtual machine)
+
+# To run the full terasort benchmark three separate steps required. In general the
+# test sorts a random table of rows each 100 bytes in length. The total amount of data 
+# written is 100 times the number of rows. The number of rows is an
+# input argument to the first step (e.g. In the example we will run below,
+# we want to sort 500 MBytes of data, we will use 5,000,000 rows as an argument
+# the other argument are input and output directories in HDFS.)
+
+# There are three steps to run the complete test:
+#  1) generate the table
+#  2) sort the table
+#  3) validate the sort
+
+# 1. Run teragen to generate .5 GB of data, 5,000,000 rows of random data to sort
+
+  $ yarn jar  $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar teragen 5000000 /user/hands-on/TeraGen-500MB
+
+# 2. Run terasort to sort the data
+
+  $ yarn jar  $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar terasort /user/hands-on/TeraGen-500MB /user/hands-on/TeraSort-500MB
+
+# 3. Run teravalidate to validate the sort results
+
+  $ yarn jar  $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar teravalidate  /user/hands-on/TeraSort-500MB /user/hands-on/TeraValid-500MB
+
+# Don't forget to delete your sort and validate files in HDFS
+
+  $ hdfs dfs -rm -r  Tera*-500MB
+
+
+Example Source Code
+===================
+
+# If you are a Java programmer, you can examine the example source
+# code by performing the following steps
+
+  mkdir sources
+  cd sources
+  jar xvf $EXAMPLES/sources/hadoop-mapreduce-examples-3.3.0-sources.jar
+  
+# Source code for all the examples are in org/apache/hadoop/examples/
+
+
+
+
+
+
+
+

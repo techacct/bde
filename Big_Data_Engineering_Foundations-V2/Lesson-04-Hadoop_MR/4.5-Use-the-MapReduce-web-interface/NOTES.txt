@@ -1,0 +1,142 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 4.5 Use the MapReduce (YARN) web Interface 
+Date: 2021-08
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta6
+============================================================
+
+The YARN Jobs Web Interface
+===========================
+
+# In Lesson 3.3 we examined the HDFS NameNode web UI. Yarn also has a web UI. 
+# The UI can be viewed on the LHM by opening a browser to port 8088. 
+# To view the UI, paste the following in your local browser:
+
+  http://127.0.0.1:8088
+
+# To explore a running application, run the Pi application as was done in Lesson 4.3.
+# Increase the number of mappers to 16 so it runs longer. 
+
+  export EXAMPLES=/opt/hadoop-3.3.0/share/hadoop/mapreduce
+  yarn jar $EXAMPLES/hadoop-mapreduce-examples-3.3.0.jar pi 16 1000
+
+Killing Jobs with the Yarn Web UI
+=================================
+
+# Most users prefer using the Yarn UI. In the main job table, click on the Application ID
+# in the right "ID" column of the job you wish to kill.  If the job is running there 
+# will be a kill "tab" at the top of the window.
+
+Killing an Applications from the Command Line
+=============================================
+
+# Hadoop Yarn applications often cannot be simply killed by entering "ctl-c" 
+# at the command line. To be safe, you need to use the "yarn application" command 
+# (Or the Yarn web UI, see above) To use the command line, first
+# find your application ID (which was given in the INFO message output when you
+# first started the yarn job) To see the currently running jobs, enter
+
+  $yarn application -list
+
+# Be warned it prints very long lines. In the example below the line that starts with
+# "application_1611765473707_0005  QuasiMonteCarlo  MAPREDUCE hands-on "
+# is the line of the current running job. (The full output has been truncated
+# for better readability.)
+
+  $ yarn application -list
+  2021-01-31 13:22:34,013 INFO client.DefaultNoHARMFailoverProxyProvider: Connecting ...
+  Total number of applications (application-types: [], states: [SUBMITTED, ACCEPTED, ...
+
+  Application-Id                 Application-Name Application-Type User     Queue   State...
+  application_1611765473707_0005 QuasiMonteCarlo  MAPREDUCE        hands-on default RUNNING
+
+# To kill the job use the "-kill' option, for example:
+
+  $ yarn application -kill application_1611765473707_0005
+
+Running Examples on a Cluster
+=============================
+
+# A four node cluster is available to run examples.
+# Running on a cluster can provide a more realistic
+# picture of what a Hadoop cluster actually looks like
+# when it is running and allow the Yarn UI to show
+# much more information about a true parallel MapReduce
+# operation.
+
+# The cluster is using Cloudera/Hortonworks HDP 3.1.4
+# In order to keep the command lines short, the following
+# environment variable will be assigned:
+
+  $ export EXAMPLES=/usr/hdp/3.1.4.0-315/hadoop-mapreduce
+
+Run the pi Example
+------------------
+# NOTE this example was run in the LHM in Lesson 4.3.
+# It is run here for comparison.  In the following 
+# example there are 16 mappers and 100,000 guesses
+# in each mapper. 
+
+  $ yarn jar $EXAMPLES/hadoop-mapreduce-examples.jar pi 16 100000
+  Number of Maps  = 16
+  Samples per Map = 100000
+  Wrote input for Map #0
+  Wrote input for Map #1
+  Wrote input for Map #2
+  ...
+  ... (a lot of text)
+  ...
+  Job Finished in 16.021 seconds
+  Estimated value of Pi is 3.14157500000000000000
+
+Run the Terasort Benchmark
+--------------------------
+
+
+# In this example 50 GBytes of data will be sorted using Hadoop MapReduce.
+# The cluster could easily do more, however for the sake to this
+# demonstration, 50 GBytes is adequate.
+
+# As mentioned in Lesson 4.3, the test sorts a random table of rows each 
+# 100 bytes in length. The total amount of data written is 100 times the 
+# number of rows (e.g. in the example we will run below, we want to 
+# sort 50 GBytes of data, we will use 500,000,000 rows as an argument) 
+# The other arguments are input and output directories in HDFS.
+
+# There are three steps to run the complete test:
+#  1) generate the table
+#  2) sort the table
+#  3) validate the sort
+
+# Example below is for user "deadline" (Not "hands-on" as used in the LHM.)
+
+# 1. Run teragen to generate 50 GB of data, 500,000,000 rows of random data to sort
+
+  $ yarn jar  $EXAMPLES/hadoop-mapreduce-examples.jar teragen 500000000 /user/deadline/TeraGen-50GB
+
+# 2. Run terasort to sort the data
+
+  $ yarn jar  $EXAMPLES/hadoop-mapreduce-examples.jar terasort /user/deadline/TeraGen-50GB /user/deadline/TeraSort-50GB
+
+# 3. Run teravalidate to validate the sort results
+
+  $ yarn jar  $EXAMPLES/hadoop-mapreduce-examples.jar teravalidate  /user/deadline/TeraSort-50GB /user/hdfs/TeraValid-50GB
+
+# Interpret the results:
+# Measure the time it takes to complete the terasort application. Results are
+# usually reported in Database Size in Seconds (or Minutes).
+
+# The performance can be increased by increasing the number of reducers (default is one)
+# add the option -Dmapred.reduce.tasks=NUMBER_OF_REDUCERS
+# The command below uses 4 reducers.
+
+  $ yarn jar $EXAMPLES/hadoop-mapreduce-examples.jar terasort -Dmapred.reduce.tasks=4 /user/deadline/TeraGen-50GB /user/deadline/TeraSort-50GB
+
+# Don't forget to delete your sort and validate files in HDFS before the next run!
+
+  $ hdfs dfs -rm -r -skipTrash TeraSort-50GB
+  $ hdfs dfs -rm -r -skipTrash TeraValid-50GB
+
+# The progress of the sort will be monitored using the Yarn Web UI. 

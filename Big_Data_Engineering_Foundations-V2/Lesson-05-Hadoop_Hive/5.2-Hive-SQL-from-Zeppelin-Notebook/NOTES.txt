@@ -1,0 +1,19 @@
+============================================================
+Big Data Engineering Foundations
+
+Lesson 5.2 Run a Hive SQL example using Zeppelin Notebook
+Date: 2021-08
+Hive Version: 3.1.2
+OS: Linux, Platform: CentOS 7.7
+Virtual Machine: LHM V2-beta7
+============================================================
+
+# The Apache Hive example used in Lesson 5.1 is available as
+# a Zeppelin notebook.
+
+# To use the Zeppelin Hive example:
+
+#   1. Start the Linux Hadoop Minimal (Lesson 2.2)
+#   2. Point your local browser to:
+#       http://127.0.0.1:9995
+#   3. Open the "Hive Example" notebook
